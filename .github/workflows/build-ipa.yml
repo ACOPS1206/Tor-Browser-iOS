@@ -55,6 +55,9 @@ jobs:
           xcrun swiftc -typecheck -default-isolation MainActor -sdk "$(xcrun --sdk iphoneos --show-sdk-path)" -target arm64-apple-ios17.4 overlay/Reynard/Tor/TorNetwork.swift
           swiftc overlay/Reynard/Tor/TorNetwork.swift tests/native/main.swift -o /tmp/tor-proxy-check
           python3 scripts/test-native-proxy.py /tmp/tor-proxy-check
+      - name: Type-check Tor interface against UIKit
+        run: |
+          xcrun swiftc -typecheck -default-isolation MainActor -sdk "$(xcrun --sdk iphoneos --show-sdk-path)" -target arm64-apple-ios17.4 -import-objc-header overlay/Reynard/Tor/TorService.h overlay/Reynard/Tor/TorNetwork.swift overlay/Reynard/Tor/TorStatusViewController.swift overlay/Reynard/Tor/TorBrowserStatus.swift tests/ios-stubs.swift
       - name: Install dependencies
         run: |
           brew install python@3.12 lld cbindgen llvm cocoapods
@@ -90,7 +93,8 @@ jobs:
       - name: Compile Tor and validate application project early
         working-directory: upstream/browser
         run: |
-          xcodebuild -project Pods/Pods.xcodeproj -scheme Tor -configuration Release -sdk iphoneos -arch arm64 CODE_SIGNING_ALLOWED=NO build 2>&1 | tee ../../tor-build.log
+          xcodebuild -project Pods/Pods.xcodeproj -scheme Tor -derivedDataPath /tmp/TorPods -configuration Release -sdk iphoneos -arch arm64 CODE_SIGNING_ALLOWED=NO build 2>&1 | tee ../../tor-build.log
+          xcrun clang -fsyntax-only -fobjc-arc -target arm64-apple-ios17.4 -isysroot "$(xcrun --sdk iphoneos --show-sdk-path)" -F/tmp/TorPods/Build/Products/Release-iphoneos/Tor -I../../overlay/Reynard/Tor ../../overlay/Reynard/Tor/TorService.m
           xcodebuild -workspace Reynard.xcworkspace -scheme Reynard -showBuildSettings CODE_SIGNING_ALLOWED=NO > ../../app-build-settings.log
       - name: Setup sccache
         uses: mozilla-actions/sccache-action@v0.0.11
