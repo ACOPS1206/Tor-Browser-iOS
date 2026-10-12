@@ -77,6 +77,18 @@ def apply(target, browser_only=False):
     shutil.copy2(ROOT / 'Podfile', browser / 'Podfile')
     replace(app / 'Bridging/Reynard-Bridging-Header.h', '#import "ExtensionBridge.h"', '#import "TorService.h"\n#import "ExtensionBridge.h"')
     replace(app / 'main.swift', 'GeckoRuntime.main(argc:', 'TorPrivacy.prepareBeforeGecko()\nTBIOTorService.shared.start()\n\nGeckoRuntime.main(argc:')
+    # The fork requires iOS 17.4; remove upstream's obsolete iOS 13 path.
+    main = app / 'main.swift'
+    text = main.read_text()
+    start = text.index('@available(iOS, introduced: 13.0, obsoleted: 14.0)')
+    end = text.index('private func configureSandboxExtension()', start)
+    main.write_text(text[:start] + text[end:])
+    replace(main, """if #unavailable(iOS 14.0),
+   getEntitlementValue("com.apple.private.security.no-sandbox") {
+    configureUnsandboxedAppDataDirectories()
+}
+
+""", '')
     apply_memory_storage(app)
     # Upstream compatibility overrides run before Navigator's RFP checks.
     # Do not let per-site UA/appVersion/oscpu/buildID overrides defeat RFP.

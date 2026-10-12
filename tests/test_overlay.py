@@ -35,6 +35,8 @@ class OverlayIntegrationTests(unittest.TestCase):
                 self.assertIn(f'pref({json.dumps(key)}, {json.dumps(value)}, locked);', defaults.read_text())
                 self.assertIn(f'Services.prefs.lockPref({json.dumps(key)});', startup.read_text())
             app = target / 'browser/Reynard'
+            self.assertNotIn('configureUnsandboxedAppDataDirectories', (app / 'main.swift').read_text())
+            self.assertNotIn('#unavailable(iOS 14.0)', (app / 'main.swift').read_text())
             for path in app.glob('Client/**/*.swift'):
                 source = path.read_text()
                 self.assertNotIn('URLSession.shared', source, str(path))

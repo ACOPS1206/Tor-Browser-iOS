@@ -72,7 +72,8 @@ jobs:
         with:
           targets: aarch64-apple-ios
       - name: Cache dependencies
-        uses: actions/cache@v4
+        id: dependencies
+        uses: actions/cache/restore@v4
         with:
           path: |
             ~/.cargo/registry
@@ -110,9 +111,24 @@ jobs:
           python3 scripts/check-gecko-prefs.py upstream/engine/firefox
           node --check upstream/engine/firefox/mobile/shared/modules/geckoview/TBIOPrivacy.sys.mjs
           node --check upstream/engine/firefox/mobile/shared/components/geckoview/GeckoViewStartup.sys.mjs
+      - name: Fingerprint native build toolchain
+        id: toolchain
+        run: |
+          digest=$( { xcodebuild -version; xcrun --sdk iphoneos --show-sdk-version; rustc -Vv; clang --version; } | shasum -a 256 | cut -d ' ' -f 1)
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+      - name: Restore compiled engine and JIT assets
+        id: native-assets
+        uses: actions/cache/restore@v4
+        with:
+          path: native-assets.tar
+          key: tor-ios-native-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.toolchain.outputs.digest }}-${{ hashFiles('upstream.lock.json', 'privacy-prefs.json', 'overlay/Gecko/**', 'scripts/apply-overlay.py') }}
+      - name: Unpack compiled native assets
+        if: steps.native-assets.outputs.cache-hit == 'true'
+        run: tar -xf native-assets.tar -C upstream
       - name: Setup sccache
         uses: mozilla-actions/sccache-action@v0.0.11
       - name: Build Gecko
+        if: steps.native-assets.outputs.cache-hit != 'true'
         working-directory: upstream
         env:
           CC: clang
@@ -120,8 +136,30 @@ jobs:
           LD: ld64.lld
         run: ./tools/development/build-gecko.sh --use-sccache --auto-clobber 2>&1 | tee ../gecko-build.log
       - name: Build JIT helper library
+        if: steps.native-assets.outputs.cache-hit != 'true'
         working-directory: upstream
         run: ./tools/development/build-idevice.sh 2>&1 | tee ../idevice-build.log
+      - name: Pack compiled native assets
+        if: steps.native-assets.outputs.cache-hit != 'true'
+        run: |
+          # Dereference dist symlinks so the restored package is self-contained.
+          tar -chf native-assets.tar -C upstream engine/firefox/obj-aarch64-apple-ios/dist browser/Reynard/JIT/RPPairing/libidevice_ffi.a
+      - name: Save compiled assets before app archive
+        if: steps.native-assets.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: native-assets.tar
+          key: ${{ steps.native-assets.outputs.cache-primary-key }}
+      - name: Save downloaded dependencies before app archive
+        if: steps.dependencies.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ~/.mozbuild
+            ~/Library/Caches/CocoaPods
+          key: ${{ steps.dependencies.outputs.cache-primary-key }}
       - name: Archive app
         working-directory: upstream
         run: ./tools/release/build-app.sh --no-signing 2>&1 | tee ../app-build.log
