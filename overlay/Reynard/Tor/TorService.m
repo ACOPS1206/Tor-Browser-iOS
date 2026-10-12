@@ -85,9 +85,15 @@
             if (self.attempts == 60) { self.statusText = @"Tor 시작 지연 / Startup delayed"; [self publish]; }
             return;
         }
+        NSString *controlLine = [NSString stringWithContentsOfURL:self.configuration.controlPortFile encoding:NSUTF8StringEncoding error:nil];
+        NSRegularExpression *controlPattern = [NSRegularExpression regularExpressionWithPattern:@"^PORT=127\\.0\\.0\\.1:([0-9]+)\\s*$" options:0 error:nil];
+        NSTextCheckingResult *address = controlLine ? [controlPattern firstMatchInString:controlLine options:0 range:NSMakeRange(0, controlLine.length)] : nil;
+        if (!address) return; // The control file may still be being written.
+        NSInteger port = [[controlLine substringWithRange:[address rangeAtIndex:1]] integerValue];
+        if (port < 1 || port > 65535) return;
         self.authenticating = YES;
         // Control socket connection is local only; no DNS or external connection is made here.
-        TORController *controller = [[TORController alloc] initWithControlPortFile:self.configuration.controlPortFile];
+        TORController *controller = [[TORController alloc] initWithSocketHost:@"127.0.0.1" port:(in_port_t)port];
         NSError *error = nil;
         if (!controller.connected && ![controller connect:&error]) { self.authenticating = NO; return; }
         self.controller = controller;
@@ -102,11 +108,11 @@
     [self.controller getInfoForKeys:@[@"status/bootstrap-phase", @"status/circuit-established"] completion:^(NSArray<NSString *> *values) {
         dispatch_async(dispatch_get_main_queue(), ^{
             if (self.paused) return;
-            NSString *phase = values.firstObject ?: @"";
+            NSString *phase = [values.firstObject isKindOfClass:NSString.class] ? values.firstObject : @"";
             NSRegularExpression *regex = [NSRegularExpression regularExpressionWithPattern:@"PROGRESS=([0-9]+)" options:0 error:nil];
             NSTextCheckingResult *match = [regex firstMatchInString:phase options:0 range:NSMakeRange(0, phase.length)];
             if (match) self.bootstrapProgress = [[phase substringWithRange:[match rangeAtIndex:1]] integerValue];
-            self.ready = self.bootstrapProgress == 100 && values.count > 1 && [values[1] isEqualToString:@"1"];
+            self.ready = self.bootstrapProgress == 100 && values.count > 1 && [values[1] isKindOfClass:NSString.class] && [values[1] isEqualToString:@"1"];
             self.statusText = self.ready ? @"Tor 연결됨 / Connected" : [NSString stringWithFormat:@"Tor 연결 중 / Connecting %ld%%", (long)self.bootstrapProgress];
             [self publish];
         });

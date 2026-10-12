@@ -61,8 +61,8 @@ def apply(target):
     else:
         raise RuntimeError('Gecko source must be initialized and patched before overlay')
     build = target / 'tools/release/build-app.sh'
-    replace(build, 'cp "$XCCONFIG_PATH" "$BUILD_XCCONFIG_PATH"', '''{ echo '#include "../browser/Pods/Target Support Files/Pods-Reynard/Pods-Reynard.release.xcconfig"'; cat "$XCCONFIG_PATH"; } > "$BUILD_XCCONFIG_PATH"''')
     replace(build, '-project "$PROJECT_PATH"', '-workspace "$ROOT_DIR/browser/Reynard.xcworkspace"')
+    replace(build, '-xcconfig "$BUILD_XCCONFIG_PATH"', 'CURRENT_BUILD="$BUILD_SHA"')
     # Do not depend on a compatibility dylib being present with newer SDKs.
     replace(build, '\txcrun bitcode_strip "$SWIFT_CONCURRENCY_PATH" -r -o "$SWIFT_CONCURRENCY_PATH"\n\t/usr/bin/codesign --force --sign - --verbose "$SWIFT_CONCURRENCY_PATH"', '\tif [ -f "$SWIFT_CONCURRENCY_PATH" ]; then\n\t\txcrun bitcode_strip "$SWIFT_CONCURRENCY_PATH" -r -o "$SWIFT_CONCURRENCY_PATH"\n\t\t/usr/bin/codesign --force --sign - --verbose "$SWIFT_CONCURRENCY_PATH"\n\tfi')
     packaging = target / 'tools/release/create-ipa.sh'

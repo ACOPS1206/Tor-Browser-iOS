@@ -28,7 +28,7 @@ jobs:
   build:
     needs: validate
     runs-on: macos-26
-    timeout-minutes: 180
+    timeout-minutes: 360
     env:
       SCCACHE_GHA_ENABLED: 'true'
       SCCACHE_GHA_VERSION: tor-ios-v1
