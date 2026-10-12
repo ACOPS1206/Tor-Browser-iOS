@@ -25,10 +25,13 @@ class OverlayIntegrationTests(unittest.TestCase):
             startup = engine / 'mobile/shared/components/geckoview/GeckoViewStartup.sys.mjs'
             startup.parent.mkdir(parents=True, exist_ok=True)
             startup.write_text('      case "profile-after-change": {\n}\n')
+            modules = engine / 'mobile/shared/modules/geckoview'
+            modules.mkdir(parents=True, exist_ok=True)
+            (modules / 'moz.build').write_text('EXTRA_JS_MODULES += [\n]\n')
             module.apply(target)
             prefs = json.loads((ROOT / 'privacy-prefs.json').read_text())
             for key, value in prefs.items():
-                self.assertIn(f'pref({json.dumps(key)}, {json.dumps(value)});', defaults.read_text())
+                self.assertIn(f'pref({json.dumps(key)}, {json.dumps(value)}, locked);', defaults.read_text())
                 self.assertIn(f'Services.prefs.lockPref({json.dumps(key)});', startup.read_text())
             app = target / 'browser/Reynard'
             for path in app.glob('Client/**/*.swift'):
@@ -40,6 +43,17 @@ class OverlayIntegrationTests(unittest.TestCase):
             self.assertNotIn('<string>reynard</string>', (app / 'Resources/Info.plist').read_text())
             self.assertNotIn('        fetchUpdates()', (app / 'Client/Startup/BrowserUpdates.swift').read_text())
             self.assertIn('isPrivateMode: true', (app / 'Client/SessionManagement/SessionManager.swift').read_text())
+            for name in ['HistoryStore', 'TabManagementStore', 'FaviconStore', 'SitePermissionStore']:
+                text = (app / f'Client/Stores/{name}.swift').read_text()
+                self.assertIn('sqlite3_open_v2(":memory:",', text)
+                self.assertNotIn('sqlite3_open_v2(storage.databaseURL.path,', text)
+            for name in ['TabManagementStore', 'NavigationHistoryStore', 'FaviconStore', 'SiteMetadataStore']:
+                text = (app / f'Client/Stores/{name}.swift').read_text()
+                self.assertNotIn('.write(to:', text)
+                self.assertNotIn('Data(contentsOf:', text)
+            self.assertIn('installTorChannelIsolation()', startup.read_text())
+            self.assertIn('TBIO_DISABLE_JAVASCRIPT', startup.read_text())
+            self.assertTrue((modules / 'TBIOPrivacy.sys.mjs').exists())
             self.assertIn('-workspace', (target / 'tools/release/build-app.sh').read_text())
             # Applying twice must reject changed anchors, not silently produce a broken build.
             with self.assertRaises(RuntimeError):

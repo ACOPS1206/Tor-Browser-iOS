@@ -62,7 +62,8 @@
     config.options = [@{
         @"SocksPort": @"127.0.0.1:19050 IsolateSOCKSAuth IsolateDestAddr IsolateDestPort",
         @"SafeSocks": @"1", @"TestSocks": @"1", @"ClientRejectInternalAddresses": @"1",
-        @"ClientUseIPv6": @"1", @"Log": @"notice stdout"
+        @"ClientDNSRejectInternalAddresses": @"1", @"SafeLogging": @"1",
+        @"ClientUseIPv6": @"1", @"Log": @"warn stdout"
     } mutableCopy];
     self.configuration = config;
     self.torThread = [[TORThread alloc] initWithConfiguration:config];

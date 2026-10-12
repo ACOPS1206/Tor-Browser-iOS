@@ -8,7 +8,10 @@ Reynard's native iOS Gecko browser with an embedded Tor client. This is an **uno
 - Gecko 시작 전에 SOCKS5와 원격 DNS 설정 적용. 프록시 우회 목록 제거, 직접 연결 fallback 차단, DoH 및 WebRTC/HTTP3 차단.
 - 네이티브 다운로드, 파비콘, 검색 후보, 이미지 미리보기, 미디어 artwork도 SOCKS5로 전달. Apple ProxyConfiguration의 `allowFailover = false` 적용.
 - Tor bootstrap 진행률·회로 연결 상태, 일시 정지/재연결, 새 회로 요청 UI. CookieAuthentication으로 로컬 제어 채널 인증.
-- Gecko private session 강제, RFP·letterboxing·first-party isolation 설정 활성화 및 엔진 pref 잠금.
+- Gecko private session·RFP·first-party isolation 강제 및 엔진 pref 잠금. 최상위 사이트별 임시 SOCKS 인증값과 연결 풀 격리 추가.
+- 웹 JavaScript JIT/WASM/WebGPU/센서/DRM 제한, HTTPS-Only 고정 및 onion 예외. Tor 화면에서 다음 실행의 JavaScript 완전 차단을 선택할 수 있습니다.
+- 방문 기록·탭·탐색 썸네일·파비콘·사이트 메타데이터·권한은 메모리에만 저장. 자동 HTTP 디스크 캐시 비활성화, 이전 자동 탐색 기록은 시작 시 정리합니다.
+- 웹 탐색의 외부 앱 URL 스킴 차단. 사이트별 UA 지문 override 사용 중단, 웹 언어를 en-US/en으로 통일.
 - 본가 Reynard 자동 업데이트 차단 (Tor 기능 없는 앱으로 바뀌는 것 방지).
 - 재현 가능한 upstream 커밋과 Tor.framework 커밋 고정. GitHub Actions가 unsigned IPA와 SHA-256을 생성.
 
@@ -22,13 +25,15 @@ Reynard의 JIT 활성화는 설치 방식·iOS 버전에 따라 별도 설정이
 
 ## 현재 한계
 
-- **공식 Tor Browser의 Gecko 패치 전체, NoScript 보안 수준 UI, 최상위 사이트별 SOCKS 자격 증명 격리는 아직 이식하지 않았습니다.** RFP 설정만으로 다른 Tor Browser 사용자와 동일한 지문을 보장할 수 없습니다.
-- Tor의 IsolateDestAddr/IsolateDestPort/IsolateSOCKSAuth를 사용하지만 공식 브라우저의 사이트별 회로 격리와 같지 않습니다.
+- **공식 Tor Browser의 Gecko 패치 전체, NoScript, letterboxing은 아직 이식하지 않았습니다.** RFP 설정만으로 다른 Tor Browser 사용자와 동일한 지문을 보장할 수 없습니다. 기존 letterboxing 설정만으로 기능이 구현되었다고 볼 수 없어 제거했습니다.
+- 최상위 사이트별 SOCKS 인증값 격리는 구현했지만 실기기의 Gecko 채널 originAttributes 및 Tor 실연결 검증은 아직 필요합니다. Foundation 요청에는 해당 사이트 문맥이 전달되지 않습니다.
 - ‘새 회로 요청’은 NEWNYM 요청이며 Tor가 rate-limit할 수 있습니다. 쿠키·탭·캐시·진행 중 연결을 지우는 ‘새 신원’ 기능이 아닙니다.
-- private Gecko 세션을 사용해도 Reynard UI의 탭/히스토리/즐겨찾기 및 다운로드 파일 저장 정책 전체를 변경한 것은 아닙니다. 저장된 데이터는 UI에서 직접 삭제하세요.
+- 자동 탐색 기록은 실행 중 메모리에 유지되며 앱을 완전히 종료하면 탭·방문 기록을 복원하지 않습니다. 즐겨찾기와 명시적 다운로드 파일은 저장됩니다. OS가 만드는 기록까지 완전히 제거하지는 않습니다.
 - obfs4/Snowflake bridges UI와 transport 라이브러리 통합은 후속 작업입니다. 직접 Tor 연결을 차단하는 네트워크에서는 연결되지 않을 수 있습니다.
 - iOS가 앱을 background에서 suspend하면 내장 Tor도 멈출 수 있습니다. SOCKS 설정은 유지되며 일반 연결로 전환하지 않습니다.
 - 실기기에서 DNS·리다이렉트·미디어·다운로드·연결 중단·지문에 대한 네트워크 검증이 필요합니다. 현재 배포물을 익명성이 검증된 제품으로 취급하지 마세요.
+
+보호 기능 분석·공식 소스 링크·구체적인 적용 범위와 검증 한계는 [SECURITY_REVIEW.md](docs/SECURITY_REVIEW.md)에 기록했습니다. JavaScript 차단 선택은 앱을 완전히 종료하고 재실행해야 반영됩니다. JIT/WASM 제한으로 일부 사이트가 느려지거나 동작하지 않을 수 있습니다.
 
 ## Source / 빌드
 

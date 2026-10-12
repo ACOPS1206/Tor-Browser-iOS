@@ -25,6 +25,10 @@ jobs:
       - run: python3 -m unittest discover -s tests -v
         env:
           UPSTREAM_SOURCE: upstream
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node tests/tor-isolation.mjs
   build:
     needs: validate
     runs-on: macos-26
@@ -57,7 +61,7 @@ jobs:
           python3 scripts/test-native-proxy.py /tmp/tor-proxy-check
       - name: Type-check Tor interface against UIKit
         run: |
-          xcrun swiftc -typecheck -default-isolation MainActor -sdk "$(xcrun --sdk iphoneos --show-sdk-path)" -target arm64-apple-ios17.4 -import-objc-header overlay/Reynard/Tor/TorService.h overlay/Reynard/Tor/TorNetwork.swift overlay/Reynard/Tor/TorStatusViewController.swift overlay/Reynard/Tor/TorBrowserStatus.swift tests/ios-stubs.swift
+          xcrun swiftc -typecheck -default-isolation MainActor -sdk "$(xcrun --sdk iphoneos --show-sdk-path)" -target arm64-apple-ios17.4 -import-objc-header overlay/Reynard/Tor/TorService.h overlay/Reynard/Tor/TorNetwork.swift overlay/Reynard/Tor/TorPrivacy.swift overlay/Reynard/Tor/TorStatusViewController.swift overlay/Reynard/Tor/TorBrowserStatus.swift tests/ios-stubs.swift
       - name: Install dependencies
         run: |
           brew install python@3.12 lld cbindgen llvm cocoapods
@@ -79,6 +83,9 @@ jobs:
           restore-keys: tor-ios-deps-v1-${{ runner.arch }}-
       - name: Apply Tor integration
         run: python3 scripts/apply-overlay.py upstream browser
+      - name: Parse modified native stores and navigation policy
+        run: |
+          xcrun swiftc -frontend -parse -sdk "$(xcrun --sdk iphoneos --show-sdk-path)" -target arm64-apple-ios17.4 upstream/browser/Reynard/Client/Stores/{HistoryStore,TabManagementStore,NavigationHistoryStore,FaviconStore,SiteMetadataStore,SitePermissionStore}.swift upstream/browser/GeckoView/Delegates/NavigationDelegate.swift
       - name: Integrate pinned embedded Tor
         working-directory: upstream/browser
         run: |
@@ -98,6 +105,11 @@ jobs:
           ./tools/development/apply-patches.sh
       - name: Apply Tor policy before engine compilation
         run: python3 scripts/apply-overlay.py upstream engine
+      - name: Validate Gecko preference names and module syntax
+        run: |
+          python3 scripts/check-gecko-prefs.py upstream/engine/firefox
+          node --check upstream/engine/firefox/mobile/shared/modules/geckoview/TBIOPrivacy.sys.mjs
+          node --check upstream/engine/firefox/mobile/shared/components/geckoview/GeckoViewStartup.sys.mjs
       - name: Setup sccache
         uses: mozilla-actions/sccache-action@v0.0.11
       - name: Build Gecko

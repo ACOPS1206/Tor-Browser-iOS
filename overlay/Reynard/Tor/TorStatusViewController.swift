@@ -4,6 +4,7 @@ final class TorStatusViewController: UIViewController {
     private let statusLabel = UILabel()
     private let progress = UIProgressView(progressViewStyle: .default)
     private let pauseButton = UIButton(type: .system)
+    private let javaScriptButton = UIButton(type: .system)
     override func viewDidLoad() {
         super.viewDidLoad()
         title = "Tor"
@@ -18,7 +19,9 @@ final class TorStatusViewController: UIViewController {
         let circuit = UIButton(type: .system)
         circuit.setTitle("새 회로 요청 / Request new circuit", for: .normal)
         circuit.addTarget(self, action: #selector(newCircuit), for: .touchUpInside)
-        let stack = UIStackView(arrangedSubviews: [statusLabel, progress, pauseButton, circuit, info])
+        javaScriptButton.titleLabel?.numberOfLines = 0
+        javaScriptButton.addTarget(self, action: #selector(toggleJavaScript), for: .touchUpInside)
+        let stack = UIStackView(arrangedSubviews: [statusLabel, progress, pauseButton, circuit, javaScriptButton, info])
         stack.axis = .vertical
         stack.spacing = 24
         stack.translatesAutoresizingMaskIntoConstraints = false
@@ -38,12 +41,19 @@ final class TorStatusViewController: UIViewController {
         progress.progress = Float(tor.bootstrapProgress) / 100
         pauseButton.setTitle(tor.paused ? "Tor 다시 연결 / Resume" : "Tor 일시 정지 / Pause", for: .normal)
         pauseButton.isEnabled = tor.ready || tor.paused
+        javaScriptButton.setTitle(TorPrivacy.disableJavaScript
+            ? "다음 실행: JavaScript 차단 / JS blocked on restart"
+            : "다음 실행: JavaScript 허용 / JS allowed on restart", for: .normal)
     }
     @objc private func togglePause() {
         let tor = TBIOTorService.shared
         if tor.paused { tor.start() } else { tor.pause() }
     }
     @objc private func newCircuit() { TBIOTorService.shared.requestNewCircuit() }
+    @objc private func toggleJavaScript() {
+        TorPrivacy.disableJavaScript.toggle()
+        refresh()
+    }
 }
 
 extension SettingsViewController {

@@ -43,5 +43,23 @@ class PolicyTests(unittest.TestCase):
             self.assertRegex(lock[key], r'^[0-9a-f]{40}$')
         self.assertIn(lock['tor_framework_commit'], (ROOT / 'Podfile').read_text())
 
+    def test_hardening_does_not_rely_on_removed_prefs(self):
+        self.assertNotIn('privacy.resistFingerprinting.letterboxing', self.prefs)
+        self.assertNotIn('javascript.options.asmjs', self.prefs)
+        self.assertTrue(self.prefs['network.dns.disabled'])
+        self.assertTrue(self.prefs['network.lna.blocking'])
+        self.assertFalse(self.prefs['network.lna.allow_top_level_navigation'])
+        self.assertEqual(self.prefs['privacy.resistFingerprinting.exemptedDomains'], '')
+
+    def test_active_content_and_disk_cache_restrictions(self):
+        for key in ['javascript.options.ion', 'javascript.options.baselinejit',
+                    'javascript.options.native_regexp', 'javascript.options.wasm',
+                    'dom.webgpu.enabled', 'browser.cache.disk.enable',
+                    'device.sensors.enabled', 'dom.battery.enabled',
+                    'network.protocol-handler.external-default']:
+            self.assertFalse(self.prefs[key], key)
+        self.assertTrue(self.prefs['dom.security.https_only_mode'])
+        self.assertFalse(self.prefs['dom.security.https_only_mode.upgrade_onion'])
+
 if __name__ == '__main__':
     unittest.main()
