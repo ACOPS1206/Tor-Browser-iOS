@@ -89,7 +89,7 @@
         // Control socket connection is local only; no DNS or external connection is made here.
         TORController *controller = [[TORController alloc] initWithControlPortFile:self.configuration.controlPortFile];
         NSError *error = nil;
-        if (![controller connect:&error]) { self.authenticating = NO; return; }
+        if (!controller.connected && ![controller connect:&error]) { self.authenticating = NO; return; }
         self.controller = controller;
         [controller authenticateWithData:cookie completion:^(BOOL success, NSError *error) {
             dispatch_async(dispatch_get_main_queue(), ^{
