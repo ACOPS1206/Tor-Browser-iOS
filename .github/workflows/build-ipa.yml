@@ -77,14 +77,8 @@ jobs:
             ~/Library/Caches/CocoaPods
           key: tor-ios-deps-v1-${{ runner.arch }}-${{ hashFiles('upstream.lock.json', 'Podfile') }}
           restore-keys: tor-ios-deps-v1-${{ runner.arch }}-
-      - name: Initialize engine and JIT sources
-        working-directory: upstream
-        run: |
-          git submodule update --init --recursive support/idevice
-          ./tools/development/update-gecko.sh
-          ./tools/development/apply-patches.sh
       - name: Apply Tor integration
-        run: python3 scripts/apply-overlay.py upstream
+        run: python3 scripts/apply-overlay.py upstream browser
       - name: Integrate pinned embedded Tor
         working-directory: upstream/browser
         run: |
@@ -96,6 +90,14 @@ jobs:
           xcodebuild -project Pods/Pods.xcodeproj -scheme Tor -derivedDataPath /tmp/TorPods -configuration Release -sdk iphoneos -arch arm64 CODE_SIGNING_ALLOWED=NO build 2>&1 | tee ../../tor-build.log
           xcrun clang -fsyntax-only -fobjc-arc -target arm64-apple-ios17.4 -isysroot "$(xcrun --sdk iphoneos --show-sdk-path)" -F/tmp/TorPods/Build/Products/Release-iphoneos/Tor -I../../overlay/Reynard/Tor ../../overlay/Reynard/Tor/TorService.m
           xcodebuild -workspace Reynard.xcworkspace -scheme Reynard -showBuildSettings CODE_SIGNING_ALLOWED=NO > ../../app-build-settings.log
+      - name: Initialize engine and JIT sources
+        working-directory: upstream
+        run: |
+          git submodule update --init --recursive support/idevice
+          ./tools/development/update-gecko.sh
+          ./tools/development/apply-patches.sh
+      - name: Apply Tor policy before engine compilation
+        run: python3 scripts/apply-overlay.py upstream engine
       - name: Setup sccache
         uses: mozilla-actions/sccache-action@v0.0.11
       - name: Build Gecko

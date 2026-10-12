@@ -66,22 +66,23 @@ def listener(port):
     server.listen(5)
     return server
 
-thread = threading.Thread(target=proxy, args=(listener(19050),), daemon=True)
-thread.start()
-subprocess.run([binary, 'routing'], check=True, timeout=25)
-thread.join(timeout=20)
-assert not errors, errors
-assert not thread.is_alive(), 'Proxy test did not terminate'
 trap_thread = threading.Thread(target=trap, args=(listener(19051),), daemon=True)
 trap_thread.start()
-# The SOCKS listener is now gone. A direct connection would reach the trap.
-subprocess.run([binary, 'failure'], check=True, timeout=25)
-for phase in ['local', 'short-ip', 'octal-ip', 'hex-ip']:
-    subprocess.run([binary, phase], check=True, timeout=25)
-redirect_thread = threading.Thread(target=proxy, args=(listener(19050), True), daemon=True)
-redirect_thread.start()
-subprocess.run([binary, 'redirect'], check=True, timeout=25)
-redirect_thread.join(timeout=20)
-assert not errors, errors
-assert not direct_hits, 'Native request or redirect bypassed Tor proxy'
-print('Remote DNS, no-direct-fallback, local address and redirect checks passed')
+for prefix in ['', 'download-']:
+    thread = threading.Thread(target=proxy, args=(listener(19050),), daemon=True)
+    thread.start()
+    subprocess.run([binary, prefix + 'routing'], check=True, timeout=25)
+    thread.join(timeout=20)
+    assert not errors, errors
+    assert not thread.is_alive(), 'Proxy test did not terminate'
+    # The SOCKS listener is now gone. No direct fallback may reach any origin.
+    subprocess.run([binary, prefix + 'failure'], check=True, timeout=25)
+    for phase in ['local', 'short-ip', 'octal-ip', 'hex-ip']:
+        subprocess.run([binary, prefix + phase], check=True, timeout=25)
+    redirect_thread = threading.Thread(target=proxy, args=(listener(19050), True), daemon=True)
+    redirect_thread.start()
+    subprocess.run([binary, prefix + 'redirect'], check=True, timeout=25)
+    redirect_thread.join(timeout=20)
+    assert not errors, errors
+    assert not direct_hits, 'Native request or redirect bypassed Tor proxy'
+print('Data/download remote DNS, no-direct-fallback, local address and redirect checks passed')

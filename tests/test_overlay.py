@@ -36,6 +36,8 @@ class OverlayIntegrationTests(unittest.TestCase):
                 self.assertNotIn('URLSession.shared', source, str(path))
                 self.assertNotIn('URLSessionConfiguration.default', source, str(path))
                 self.assertNotIn('URLSession(configuration: .default)', source, str(path))
+            self.assertIn('onionreynard://open', (target / 'browser/Extensions/OpenIn/OpenInViewController.swift').read_text())
+            self.assertNotIn('<string>reynard</string>', (app / 'Resources/Info.plist').read_text())
             self.assertNotIn('        fetchUpdates()', (app / 'Client/Startup/BrowserUpdates.swift').read_text())
             self.assertIn('isPrivateMode: true', (app / 'Client/SessionManagement/SessionManager.swift').read_text())
             self.assertIn('-workspace', (target / 'tools/release/build-app.sh').read_text())

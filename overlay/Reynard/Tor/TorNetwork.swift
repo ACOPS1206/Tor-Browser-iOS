@@ -36,6 +36,10 @@ nonisolated final class TorLocalAddressBlocker: URLProtocol {
         return host == "localhost" || host.hasSuffix(".localhost") || host.hasSuffix(".local")
             || !host.contains(".") || host.contains(":") || numericHost || IPv4Address(host) != nil || IPv6Address(host) != nil
     }
+    override class func canInit(with task: URLSessionTask) -> Bool {
+        guard let request = task.currentRequest ?? task.originalRequest else { return false }
+        return canInit(with: request)
+    }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
     override func startLoading() {
         client?.urlProtocol(self, didFailWithError: URLError(.unsupportedURL,

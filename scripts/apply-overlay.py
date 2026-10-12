@@ -14,7 +14,7 @@ def replace(path, before, after, count=1):
         raise RuntimeError(f'{path}: expected {count} anchors, found {actual}: {before!r}')
     path.write_text(text.replace(before, after))
 
-def apply(target):
+def apply(target, browser_only=False):
     browser = target / 'browser'
     app = browser / 'Reynard'
     prefs = json.loads((ROOT / 'privacy-prefs.json').read_text())
@@ -29,6 +29,10 @@ def apply(target):
     text = pbx.read_text().replace('com.minh-ton.Reynard', 'com.acops1206.TorBrowserIOS')
     pbx.write_text(text)
     replace(app / 'Client/Startup/BrowserUpdates.swift', '        fetchUpdates()', '        // Fork updates must never install the upstream non-Tor app. Disabled.')
+    replace(app / 'Resources/Info.plist', '<string>reynard</string>', '<string>onionreynard</string>')
+    replace(app / 'Resources/Info.plist', '<string>com.minh-ton.Reynard</string>', '<string>com.acops1206.TorBrowserIOS</string>')
+    replace(app / 'SceneDelegate.swift', 'scheme == "reynard"', 'scheme == "onionreynard"')
+    replace(browser / 'Extensions/OpenIn/OpenInViewController.swift', 'reynard://open', 'onionreynard://open')
     replace(app / 'Client/SessionManagement/SessionManager.swift', 'isPrivateMode: isPrivate,', 'isPrivateMode: true, // Always use private Gecko storage.')
     settings = app / 'Client/Interface/Library/Settings/SettingsViewController.swift'
     replace(settings, '        observeJITMode()', '        navigationItem.rightBarButtonItem = UIBarButtonItem(title: "Tor", style: .plain, target: self, action: #selector(showEmbeddedTor))\n        observeJITMode()')
@@ -47,6 +51,20 @@ def apply(target):
     runtime = browser / 'GeckoView/Runtime/GeckoRuntime.swift'
     keys = ',\n            '.join(json.dumps(key) for key in prefs)
     replace(runtime, 'message: preferences', 'message: preferences.filter { !Set<String>([\n            ' + keys + '\n        ]).contains($0.key) }')
+    if not browser_only:
+        apply_engine(target)
+    build = target / 'tools/release/build-app.sh'
+    replace(build, '-project "$PROJECT_PATH"', '-workspace "$ROOT_DIR/browser/Reynard.xcworkspace"')
+    replace(build, '-xcconfig "$BUILD_XCCONFIG_PATH"', 'CURRENT_BUILD="$BUILD_SHA"')
+    # Do not depend on a compatibility dylib being present with newer SDKs.
+    replace(build, '\txcrun bitcode_strip "$SWIFT_CONCURRENCY_PATH" -r -o "$SWIFT_CONCURRENCY_PATH"\n\t/usr/bin/codesign --force --sign - --verbose "$SWIFT_CONCURRENCY_PATH"', '\tif [ -f "$SWIFT_CONCURRENCY_PATH" ]; then\n\t\txcrun bitcode_strip "$SWIFT_CONCURRENCY_PATH" -r -o "$SWIFT_CONCURRENCY_PATH"\n\t\t/usr/bin/codesign --force --sign - --verbose "$SWIFT_CONCURRENCY_PATH"\n\tfi')
+    packaging = target / 'tools/release/create-ipa.sh'
+    text = packaging.read_text().replace('com.minh-ton.Reynard', 'com.acops1206.TorBrowserIOS').replace('OUTPUT_NAME="Reynard.ipa"', 'OUTPUT_NAME="Tor-Browser-iOS.ipa"')
+    packaging.write_text(text)
+    print('Tor overlay applied successfully')
+
+def apply_engine(target):
+    prefs = json.loads((ROOT / 'privacy-prefs.json').read_text())
     # Bake proxy prefs into Gecko before startup networking, not after first tab creation.
     engine = target / 'engine/firefox'
     if (engine / 'mobile/ios/app/mobile.js').exists():
@@ -60,15 +78,14 @@ def apply(target):
         replace(startup, '      case "profile-after-change": {', '      case "profile-after-change": {\n' + locks)
     else:
         raise RuntimeError('Gecko source must be initialized and patched before overlay')
-    build = target / 'tools/release/build-app.sh'
-    replace(build, '-project "$PROJECT_PATH"', '-workspace "$ROOT_DIR/browser/Reynard.xcworkspace"')
-    replace(build, '-xcconfig "$BUILD_XCCONFIG_PATH"', 'CURRENT_BUILD="$BUILD_SHA"')
-    # Do not depend on a compatibility dylib being present with newer SDKs.
-    replace(build, '\txcrun bitcode_strip "$SWIFT_CONCURRENCY_PATH" -r -o "$SWIFT_CONCURRENCY_PATH"\n\t/usr/bin/codesign --force --sign - --verbose "$SWIFT_CONCURRENCY_PATH"', '\tif [ -f "$SWIFT_CONCURRENCY_PATH" ]; then\n\t\txcrun bitcode_strip "$SWIFT_CONCURRENCY_PATH" -r -o "$SWIFT_CONCURRENCY_PATH"\n\t\t/usr/bin/codesign --force --sign - --verbose "$SWIFT_CONCURRENCY_PATH"\n\tfi')
-    packaging = target / 'tools/release/create-ipa.sh'
-    text = packaging.read_text().replace('com.minh-ton.Reynard', 'com.acops1206.TorBrowserIOS').replace('OUTPUT_NAME="Reynard.ipa"', 'OUTPUT_NAME="Tor-Browser-iOS.ipa"')
-    packaging.write_text(text)
-    print('Tor overlay applied successfully')
 
 if __name__ == '__main__':
-    apply(Path(sys.argv[1]).resolve())
+    target = Path(sys.argv[1]).resolve()
+    phase = sys.argv[2] if len(sys.argv) > 2 else 'all'
+    if phase == 'engine':
+        apply_engine(target)
+        print('Tor engine policy applied successfully')
+    elif phase in ('all', 'browser'):
+        apply(target, browser_only=phase == 'browser')
+    else:
+        raise SystemExit('Phase must be all, browser, or engine')
