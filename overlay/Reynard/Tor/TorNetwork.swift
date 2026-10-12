@@ -24,14 +24,17 @@ enum TorNetwork {
 
 /// CFNetwork can bypass even an explicit SOCKS proxy for loopback destinations.
 /// Reject local names and IP literals before CFNetwork can open a direct socket.
-final class TorLocalAddressBlocker: URLProtocol {
+nonisolated final class TorLocalAddressBlocker: URLProtocol {
     override class func canInit(with request: URLRequest) -> Bool {
         guard let url = request.url,
               ["http", "https"].contains(url.scheme?.lowercased() ?? ""),
               let rawHost = url.host else { return false }
         let host = rawHost.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "[]."))
+        let numericHost = host.split(separator: ".").allSatisfy { label in
+            label.allSatisfy(\.isNumber) || (label.hasPrefix("0x") && label.dropFirst(2).allSatisfy(\.isHexDigit))
+        }
         return host == "localhost" || host.hasSuffix(".localhost") || host.hasSuffix(".local")
-            || !host.contains(".") || IPv4Address(host) != nil || IPv6Address(host) != nil
+            || !host.contains(".") || host.contains(":") || numericHost || IPv4Address(host) != nil || IPv6Address(host) != nil
     }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
     override func startLoading() {

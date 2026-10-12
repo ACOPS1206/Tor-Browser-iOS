@@ -76,7 +76,8 @@ trap_thread = threading.Thread(target=trap, args=(listener(19051),), daemon=True
 trap_thread.start()
 # The SOCKS listener is now gone. A direct connection would reach the trap.
 subprocess.run([binary, 'failure'], check=True, timeout=25)
-subprocess.run([binary, 'local'], check=True, timeout=25)
+for phase in ['local', 'short-ip', 'octal-ip', 'hex-ip']:
+    subprocess.run([binary, phase], check=True, timeout=25)
 redirect_thread = threading.Thread(target=proxy, args=(listener(19050), True), daemon=True)
 redirect_thread.start()
 subprocess.run([binary, 'redirect'], check=True, timeout=25)

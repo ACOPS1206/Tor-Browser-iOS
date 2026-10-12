@@ -1,0 +1,8 @@
+/upstream/
+/dist/
+__pycache__/
+*.pyc
+*-build.log
+app-build-settings.log
+Podfile.resolved.lock
+.DS_Store

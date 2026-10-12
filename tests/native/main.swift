@@ -1,7 +1,8 @@
 import Foundation
 
 let phase = CommandLine.arguments.last ?? "routing"
-let endpoint = phase == "local" ? "http://127.0.0.1:19051/" : "http://tor-routing-test.invalid/"
+let localHosts = ["local": "127.0.0.1", "short-ip": "127.1", "octal-ip": "0177.0.0.1", "hex-ip": "0x7f.0.0.1"]
+let endpoint = localHosts[phase].map { "http://\($0):19051/" } ?? "http://tor-routing-test.invalid/"
 let done = DispatchSemaphore(value: 0)
 var passed = false
 TorNetwork.session.dataTask(with: URL(string: endpoint)!) { data, response, error in

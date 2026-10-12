@@ -52,6 +52,7 @@ jobs:
           xcode-version: '26.6'
       - name: Test native proxy routing and fail-closed behavior
         run: |
+          xcrun swiftc -typecheck -default-isolation MainActor -sdk "$(xcrun --sdk iphoneos --show-sdk-path)" -target arm64-apple-ios17.4 overlay/Reynard/Tor/TorNetwork.swift
           swiftc overlay/Reynard/Tor/TorNetwork.swift tests/native/main.swift -o /tmp/tor-proxy-check
           python3 scripts/test-native-proxy.py /tmp/tor-proxy-check
       - name: Install dependencies
