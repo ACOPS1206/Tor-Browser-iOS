@@ -1,0 +1,7 @@
+{
+  "repository": "https://github.com/minh-ton/reynard-browser.git",
+  "commit": "ddaacd18b8c5661d495acfc0f3e90a86c484e64d",
+  "firefox_release": "FIREFOX_157_0_1_RELEASE",
+  "tor_framework_commit": "51cc492a817bbbc8a647b493d7dde2c0b765ae41",
+  "tor_pod_version": "409.13.1"
+}
