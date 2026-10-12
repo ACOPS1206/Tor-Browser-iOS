@@ -33,5 +33,9 @@
   "extensions.systemAddon.update.enabled": false,
   "extensions.update.enabled": false,
   "extensions.getAddons.cache.enabled": false,
-  "devtools.debugger.remote-enabled": false
+  "devtools.debugger.remote-enabled": false,
+  "network.captive-portal-service.enabled": false,
+  "network.connectivity-service.enabled": false,
+  "network.predictor.enabled": false,
+  "network.dns.disablePrefetchFromHTTPS": true
 }
