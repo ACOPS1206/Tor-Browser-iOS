@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Reject typos/removed prefs instead of silently creating inert Gecko prefs."""
+import ast
 import json
 import re
 import sys
@@ -22,4 +23,10 @@ prefs = json.loads((root / 'privacy-prefs.json').read_text())
 missing = [key for key in prefs if key not in names and f'"{key}"' not in sources]
 if missing:
     raise SystemExit('Unverified Gecko policy prefs: ' + ', '.join(missing))
+manifest = ast.parse((engine / 'mobile/shared/modules/geckoview/moz.build').read_text())
+for statement in manifest.body:
+    if isinstance(statement, ast.AugAssign) and isinstance(statement.target, ast.Name) and statement.target.id == 'EXTRA_JS_MODULES':
+        names = ast.literal_eval(statement.value)
+        if names != sorted(names, key=str.lower):
+            raise SystemExit('Gecko EXTRA_JS_MODULES must be alphabetically sorted')
 print(f'Validated {len(prefs)} policy preference names against the compiled Gecko source')

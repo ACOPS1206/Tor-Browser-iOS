@@ -1,5 +1,6 @@
 """Exercise the transformation against an actual pinned Reynard checkout when supplied."""
 import importlib.util
+import ast
 import json
 import os
 import shutil
@@ -27,7 +28,7 @@ class OverlayIntegrationTests(unittest.TestCase):
             startup.write_text('      case "profile-after-change": {\n}\n')
             modules = engine / 'mobile/shared/modules/geckoview'
             modules.mkdir(parents=True, exist_ok=True)
-            (modules / 'moz.build').write_text('EXTRA_JS_MODULES += [\n]\n')
+            (modules / 'moz.build').write_text('EXTRA_JS_MODULES += [\n    "BrowserUsageTelemetry.sys.mjs",\n    "Messaging.sys.mjs",\n]\n')
             module.apply(target)
             prefs = json.loads((ROOT / 'privacy-prefs.json').read_text())
             for key, value in prefs.items():
@@ -54,6 +55,12 @@ class OverlayIntegrationTests(unittest.TestCase):
             self.assertIn('installTorChannelIsolation()', startup.read_text())
             self.assertIn('TBIO_DISABLE_JAVASCRIPT', startup.read_text())
             self.assertTrue((modules / 'TBIOPrivacy.sys.mjs').exists())
+            # Python syntax alone accepts unsorted lists, but mozbuild rejects them.
+            manifest = ast.parse((modules / 'moz.build').read_text())
+            for statement in manifest.body:
+                if isinstance(statement, ast.AugAssign) and isinstance(statement.target, ast.Name) and statement.target.id == 'EXTRA_JS_MODULES':
+                    names = ast.literal_eval(statement.value)
+                    self.assertEqual(names, sorted(names, key=str.lower))
             self.assertIn('-workspace', (target / 'tools/release/build-app.sh').read_text())
             # Applying twice must reject changed anchors, not silently produce a broken build.
             with self.assertRaises(RuntimeError):

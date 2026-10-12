@@ -149,7 +149,9 @@ def apply_engine(target):
                 stream.write(f'pref({json.dumps(key)}, {json.dumps(value)}, locked);\n')
         modules = engine / 'mobile/shared/modules/geckoview'
         shutil.copy2(ROOT / 'overlay/Gecko/TBIOPrivacy.sys.mjs', modules / 'TBIOPrivacy.sys.mjs')
-        replace(modules / 'moz.build', 'EXTRA_JS_MODULES += [', 'EXTRA_JS_MODULES += [\n    "TBIOPrivacy.sys.mjs",')
+        # mozbuild enforces alphabetical ordering, not just Python syntax.
+        replace(modules / 'moz.build', '    "Messaging.sys.mjs",',
+            '    "Messaging.sys.mjs",\n    "TBIOPrivacy.sys.mjs",')
         startup = engine / 'mobile/shared/components/geckoview/GeckoViewStartup.sys.mjs'
         locks = '\n'.join('        Services.prefs.lockPref(' + json.dumps(key) + ');' for key in prefs)
         policy = '''
