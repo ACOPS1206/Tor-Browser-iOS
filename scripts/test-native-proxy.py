@@ -20,7 +20,7 @@ def read_exact(client, count):
         result += part
     return result
 
-def proxy(server):
+def proxy(server, redirect=False):
     try:
         client, _ = server.accept()
         with client:
@@ -39,7 +39,10 @@ def proxy(server):
             while b'\r\n\r\n' not in request:
                 request += client.recv(4096)
             body = b'tor-proxy-sentinel'
-            client.sendall(b'HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: ' + str(len(body)).encode() + b'\r\n\r\n' + body)
+            if redirect:
+                client.sendall(b'HTTP/1.1 302 Found\r\nLocation: http://127.0.0.1:19051/\r\nConnection: close\r\nContent-Length: 0\r\n\r\n')
+            else:
+                client.sendall(b'HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: ' + str(len(body)).encode() + b'\r\n\r\n' + body)
     except Exception as error:
         errors.append(str(error))
     finally:
@@ -73,5 +76,11 @@ trap_thread = threading.Thread(target=trap, args=(listener(19051),), daemon=True
 trap_thread.start()
 # The SOCKS listener is now gone. A direct connection would reach the trap.
 subprocess.run([binary, 'failure'], check=True, timeout=25)
-assert not direct_hits, 'Native request bypassed unavailable Tor proxy'
-print('Remote DNS and no-direct-fallback checks passed')
+subprocess.run([binary, 'local'], check=True, timeout=25)
+redirect_thread = threading.Thread(target=proxy, args=(listener(19050), True), daemon=True)
+redirect_thread.start()
+subprocess.run([binary, 'redirect'], check=True, timeout=25)
+redirect_thread.join(timeout=20)
+assert not errors, errors
+assert not direct_hits, 'Native request or redirect bypassed Tor proxy'
+print('Remote DNS, no-direct-fallback, local address and redirect checks passed')

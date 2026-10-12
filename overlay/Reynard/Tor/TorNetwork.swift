@@ -12,6 +12,7 @@ enum TorNetwork {
         proxy.allowFailover = false
         proxy.excludedDomains = []
         configuration.proxyConfigurations = [proxy]
+        configuration.protocolClasses = [TorLocalAddressBlocker.self]
         configuration.urlCache = nil
         configuration.httpCookieStorage = nil
         configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
@@ -19,4 +20,23 @@ enum TorNetwork {
         configuration.timeoutIntervalForResource = 600
         return configuration
     }
+}
+
+/// CFNetwork can bypass even an explicit SOCKS proxy for loopback destinations.
+/// Reject local names and IP literals before CFNetwork can open a direct socket.
+final class TorLocalAddressBlocker: URLProtocol {
+    override class func canInit(with request: URLRequest) -> Bool {
+        guard let url = request.url,
+              ["http", "https"].contains(url.scheme?.lowercased() ?? ""),
+              let rawHost = url.host else { return false }
+        let host = rawHost.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "[]."))
+        return host == "localhost" || host.hasSuffix(".localhost") || host.hasSuffix(".local")
+            || !host.contains(".") || IPv4Address(host) != nil || IPv6Address(host) != nil
+    }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        client?.urlProtocol(self, didFailWithError: URLError(.unsupportedURL,
+            userInfo: [NSLocalizedDescriptionKey: "Local addresses and IP literals are blocked in Tor browsing."]))
+    }
+    override func stopLoading() {}
 }
