@@ -8,6 +8,12 @@ target 'Reynard' do
 end
 
 post_install do |installer|
+  # TORThread builds argv with a trailing NULL; reserve space for that sentinel.
+  thread = File.join(installer.sandbox.root.to_s, 'Tor/Tor/Classes/CTor/TORThread.m')
+  if File.exist?(thread)
+    source = File.read(thread)
+    File.write(thread, source.sub('char *argv[argc];', 'char *argv[argc + 1];'))
+  end
   installer.pods_project.targets.each do |target|
     target.build_configurations.each do |config|
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '17.4'
