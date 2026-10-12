@@ -88,7 +88,7 @@ jobs:
         working-directory: upstream/browser
         run: |
           xcodebuild -project Pods/Pods.xcodeproj -scheme Tor -derivedDataPath /tmp/TorPods -configuration Release -sdk iphoneos -arch arm64 CODE_SIGNING_ALLOWED=NO build 2>&1 | tee ../../tor-build.log
-          xcrun clang -fsyntax-only -fobjc-arc -target arm64-apple-ios17.4 -isysroot "$(xcrun --sdk iphoneos --show-sdk-path)" -F/tmp/TorPods/Build/Products/Release-iphoneos/Tor -I../../overlay/Reynard/Tor ../../overlay/Reynard/Tor/TorService.m
+          xcrun clang -fsyntax-only -fobjc-arc -fblocks -target arm64-apple-ios17.4 -isysroot "$(xcrun --sdk iphoneos --show-sdk-path)" -Fbuild/Release-iphoneos/Tor -F/tmp/TorPods/Build/Products/Release-iphoneos/Tor -I../../overlay/Reynard/Tor ../../overlay/Reynard/Tor/TorService.m
           xcodebuild -workspace Reynard.xcworkspace -scheme Reynard -showBuildSettings CODE_SIGNING_ALLOWED=NO > ../../app-build-settings.log
       - name: Initialize engine and JIT sources
         working-directory: upstream
