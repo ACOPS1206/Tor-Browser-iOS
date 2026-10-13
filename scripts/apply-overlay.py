@@ -80,7 +80,10 @@ def apply(target, browser_only=False):
     # The fork requires iOS 17.4; remove upstream's obsolete iOS 13 path.
     main = app / 'main.swift'
     text = main.read_text()
-    start = text.index('@available(iOS, introduced: 13.0, obsoleted: 14.0)')
+    legacy = '@available(iOS, introduced: 13.0, obsoleted: 14.0)'
+    if text.count(legacy) != 1 or text.count('private func configureSandboxExtension()') != 1:
+        raise RuntimeError(f'{main}: changed or already applied legacy startup anchors')
+    start = text.index(legacy)
     end = text.index('private func configureSandboxExtension()', start)
     main.write_text(text[:start] + text[end:])
     replace(main, """if #unavailable(iOS 14.0),
