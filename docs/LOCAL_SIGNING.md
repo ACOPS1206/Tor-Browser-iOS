@@ -219,3 +219,26 @@ embedded.mobileprovision이 있는 signed archive는 거부합니다. 정식 서
 - [실기기 실행과 Xcode 자동 서명](https://help.apple.com/xcode/mac/current/en.lproj/dev5a825a1ca.html)
 - [TN3125: 프로비저닝 프로파일과 권한](https://developer.apple.com/documentation/technotes/tn3125-inside-code-signing-provisioning-profiles)
 - [Increased memory limit](https://developer.apple.com/documentation/bundleresources/entitlements/com.apple.developer.kernel.increased-memory-limit)
+
+## 대안: 기존 엔진 산출물로 Xcode 자동 서명 archive
+
+고정된 upstream에 overlay·CocoaPods 적용을 마쳤고 `engine/firefox/obj-aarch64-apple-ios/dist`와
+`browser/Reynard/JIT/RPPairing/libidevice_ffi.a`가 이미 있는 경우에는,
+`upstream/browser/Reynard.xcworkspace`를 Xcode로 열어 실제 앱을 자동 서명할 수도 있습니다.
+메인·Helper·OpenIn 타깃 각각에서 Personal Team, Automatically manage signing,
+자신의 하위 Bundle ID를 설정하세요. 프레임워크 타깃에는 앱용 프로파일을 지정하지 않습니다.
+상단 Run 대상에 실제 iPhone을 선택합니다.
+
+```sh
+xcodebuild -workspace upstream/browser/Reynard.xcworkspace \\
+  -scheme Reynard -configuration Release \\
+  -destination 'id=YOUR_IPHONE_UDID' \\
+  -archivePath dist/Local-Reynard.xcarchive \\
+  -allowProvisioningUpdates -allowProvisioningDeviceRegistration archive
+```
+
+이 대안은 기존 Gecko·JIT 라이브러리를 사용하지만 Swift/Objective-C 앱 타깃은 다시 빌드합니다.
+unsigned IPA만 있다면 해당 소스·헤더 산출물이 없으므로 위 archive 경로 대신
+`sign-ipa.sh`를 사용하세요. 서명된 archive를 `create-ipa.sh`로 재포장하지 않습니다.
+Xcode Organizer의 개발용 내보내기/설치 기능을 이용하며, 계정·Xcode 버전의 허용 경로를 따릅니다.
+실제 Personal Team으로 이 archive 경로를 검증한 것은 아닙니다.
