@@ -23,6 +23,18 @@ Tor 연결은 앱 실행 시 자동 시작됩니다. 화면 위 상태 버튼이
 
 Reynard의 JIT 활성화는 설치 방식·iOS 버전에 따라 별도 설정이 필요합니다. JIT pairing/개발자 이미지(DDI) 설정은 브라우징 통신이 아니며, 기존 Reynard의 직접 로컬 연결·Apple 개발자 이미지 다운로드 경로를 유지합니다. 필요하다면 브라우징 전 설정하세요.
 
+## macOS에서 IPA 서명 및 설치
+
+Actions의 unsigned IPA를 로컬 Apple Development 인증서로 서명하는 도구를 추가했습니다. **Gecko·Tor·JIT Helper 재컴파일은 필요 없습니다.** 최초 인증서·프로파일 준비는 Xcode의 공식 자동 서명 경로를 이용합니다.
+
+```sh
+./scripts/sign-ipa.sh --input Tor-Browser-iOS.ipa --output dist/Tor-Browser-iOS-signed.ipa
+```
+
+기본 명령은 IPA의 기존 Bundle ID에 맞는 프로파일을 찾습니다. 본인 ID를 사용하는 경우 `--bundle-id`, 여러 팀은 `--team-id`를 지정하세요. 메인 앱과 두 확장의 프로파일·권한을 검사하고 중첩 코드부터 서명한 뒤 검증된 IPA와 설치용 `.app`를 출력합니다. 지원되지 않는 권한은 조용히 제거하지 않습니다.
+
+[최초 Xcode 준비, 이후 업데이트, 수동 프로파일 지정, Entitlements·7일 제한, 설치 및 오류 해결](docs/LOCAL_SIGNING.md)을 참고하세요. 실제 Apple 계정의 프로파일 발급·인증서 서명·iPhone 설치는 사용자 Mac에서 검증해야 합니다.
+
 ## 현재 한계
 
 - **공식 Tor Browser의 Gecko 패치 전체, NoScript, letterboxing은 아직 이식하지 않았습니다.** RFP 설정만으로 다른 Tor Browser 사용자와 동일한 지문을 보장할 수 없습니다. 기존 letterboxing 설정만으로 기능이 구현되었다고 볼 수 없어 제거했습니다.

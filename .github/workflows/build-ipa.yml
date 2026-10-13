@@ -2,7 +2,7 @@ name: Build Tor Browser iOS IPA
 on:
   push:
     branches: [main]
-    paths-ignore: ['README.md', 'docs/**']
+    paths-ignore: ['README.md', 'docs/**', '.gitignore', 'scripts/sign-ipa.*', 'scripts/prepare-signing-project.py', 'tests/test_signing.py', 'tests/macos-signing-smoke.py', '.github/workflows/signing-tools.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -166,7 +166,7 @@ jobs:
       - name: Package IPA
         working-directory: upstream
         run: |
-          ./tools/release/create-ipa.sh
+          ../scripts/create-ipa.sh --archive dist/Reynard.xcarchive --output dist/Tor-Browser-iOS.ipa
           shasum -a 256 dist/Tor-Browser-iOS.ipa > dist/Tor-Browser-iOS.ipa.sha256
           unzip -l dist/Tor-Browser-iOS.ipa | grep -E 'Reynard.app/Reynard|Reynard Helper.appex|OpenIn.appex'
       - name: Upload unsigned IPA

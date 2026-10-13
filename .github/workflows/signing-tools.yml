@@ -1,0 +1,49 @@
+name: Validate local signing tools
+on:
+  push:
+    paths:
+      - 'scripts/sign-ipa.*'
+      - 'scripts/create-ipa.sh'
+      - 'scripts/prepare-signing-project.py'
+      - 'tests/test_signing.py'
+      - 'tests/macos-signing-smoke.py'
+      - '.github/workflows/signing-tools.yml'
+  pull_request:
+    paths:
+      - 'scripts/sign-ipa.*'
+      - 'scripts/create-ipa.sh'
+      - 'scripts/prepare-signing-project.py'
+      - 'tests/test_signing.py'
+      - 'tests/macos-signing-smoke.py'
+      - '.github/workflows/signing-tools.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  policy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python3 -m unittest discover -s tests -p test_signing.py -v
+      - run: bash -n scripts/sign-ipa.sh scripts/create-ipa.sh
+  xcode-preparation:
+    runs-on: macos-26
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Generate small provisioning project without account credentials
+        run: |
+          python3 scripts/prepare-signing-project.py --output /tmp/SigningPreparation --bundle-id org.fixture.onion --team-id ABCDE12345
+          plutil -lint /tmp/SigningPreparation/SigningPreparation.xcodeproj/project.pbxproj
+          xcodebuild -list -project /tmp/SigningPreparation/SigningPreparation.xcodeproj
+      - name: Build all three placeholders without signing or browser engines
+        run: |
+          xcodebuild -project /tmp/SigningPreparation/SigningPreparation.xcodeproj -scheme SigningApp -configuration Debug -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath /tmp/SigningPreparationBuild CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build
+      - name: Check actual macOS unsigned packaging
+        run: python3 tests/macos-signing-smoke.py

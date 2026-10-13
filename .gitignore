@@ -6,3 +6,17 @@ __pycache__/
 app-build-settings.log
 Podfile.resolved.lock
 .DS_Store
+
+# Local signing assets and outputs never belong in Git or Actions.
+/signing.local.json
+/SigningPreparation/
+/local-signing/
+*.mobileprovision
+*.provisionprofile
+*.p12
+*.p8
+*.key
+*.ipa
+*.xcarchive/
+*.pem
+*.app/
