@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createTorChannelFilter } from "../overlay/Gecko/TBIOPrivacy.sys.mjs";
 let counter = 0;
-const service = { newProxyInfoWithAuth(...args) { return args; } };
+const service = { newProxyInfoWithAuth(...args) { assert.equal(args.length, 10); return args; } };
 const filter = createTorChannelFilter(service, () => `token-${++counter}`, 1);
 function route(domain, privateBrowsingId = 1, userContextId = 0, previous = null) {
   let calls = 0, result;
@@ -41,8 +41,15 @@ assert.ok(cancelled);
 console.log("Tor channel isolation: 10 cases passed");
 
 const routingService = {
-  newProxyInfoWithAuth(...args) { return args; },
-  newProxyInfo(...args) { return args; },
+  newProxyInfoWithAuth(...args) { assert.equal(args.length, 10); return args; },
+  newProxyInfo(...args) {
+    // Mirror the pinned Gecko IDL rather than accepting any argument count.
+    assert.equal(args.length, 8);
+    assert.equal(typeof args[3], "string");
+    assert.equal(typeof args[4], "string");
+    assert.equal(args[7], null);
+    return args;
+  },
 };
 function policy(mode, privateId) {
   const route = createTorChannelFilter(routingService, () => "token", 1, mode);
@@ -63,3 +70,29 @@ assert.equal(policy("invalid", 0), "socks");
 assert.equal(policy("", 0), "socks");
 console.log("Tor routing mode matrix: 9 cases passed");
 
+
+
+// Reproduce the old call: XPCOM rejects it and Gecko keeps the prior SOCKS proxy.
+assert.throws(() => routingService.newProxyInfo("direct", "", -1, 0, 0, null));
+for (const mode of ["never", "privateOnly"]) {
+  let received;
+  const previousSocks = { type: "socks", host: "127.0.0.1", port: 19050 };
+  createTorChannelFilter(routingService, () => "token", 1, mode).applyFilter(
+    { loadInfo: { originAttributes: { privateBrowsingId: 0 } } }, previousSocks,
+    { onProxyFilterResult(proxy) { received = proxy; } });
+  assert.equal(received[0], "direct"); // Must replace an existing SOCKS proxy.
+}
+let directCancelled = false;
+assert.throws(() => createTorChannelFilter({ newProxyInfo() { throw Error("bad direct proxy"); } },
+  () => "token", 1, "never").applyFilter({ cancel(code) {
+    assert.equal(code, 42); directCancelled = true;
+  } }, null, { onProxyFilterResult() { assert.fail("Unexpected fallback"); } }));
+assert.ok(directCancelled);
+console.log("Gecko 157 direct-proxy API regression: 4 cases passed");
+
+let privateChromeProxy;
+createTorChannelFilter(routingService, () => "token", 1, "privateOnly").applyFilter(
+  { loadInfo: { usePrivateBrowsing: true, originAttributes: { privateBrowsingId: 0 } } }, null,
+  { onProxyFilterResult(proxy) { privateChromeProxy = proxy; } });
+assert.equal(privateChromeProxy[0], "socks");
+console.log("Forced-private chrome request remains on Tor: passed");

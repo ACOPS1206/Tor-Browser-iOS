@@ -19,7 +19,7 @@ Reynard's native iOS Gecko browser with an embedded Tor client. This is an **uno
 
 **iOS 17.4 이상**. Actions의 `Build Tor Browser iOS IPA` 실행에서 `Tor-Browser-iOS-unsigned` artifact를 다운로드하고 ZIP 안의 IPA를 **SideStore 또는 AltStore로 다시 서명**해 설치하세요. **Keep App Extensions**를 선택해야 합니다. 브라우저 엔진용 Helper와 OpenIn 확장이 포함됩니다. LiveContainer는 Reynard에서 지원하지 않습니다.
 
-Tor 연결은 앱 실행 시 자동 시작됩니다. 화면 위 상태 버튼이나 Settings → Tor에서 연결 진행률과 일시 정지/새 회로 요청을 확인할 수 있습니다. 첫 연결은 시간이 걸릴 수 있습니다. https://check.torproject.org 에서 Tor 출구 사용을 확인할 수 있으나 이 검사만으로 익명성이나 모든 통신의 누출 여부가 증명되지는 않습니다.
+Tor 연결은 앱 실행 시 자동 시작됩니다. 화면 위 상태 버튼이나 Settings → Privacy → Tor Connection & Relays에서 연결 진행률과 일시 정지/새 회로 요청을 확인할 수 있습니다. 첫 연결은 시간이 걸릴 수 있습니다. https://check.torproject.org 에서 Tor 출구 사용을 확인할 수 있으나 이 검사만으로 익명성이나 모든 통신의 누출 여부가 증명되지는 않습니다.
 
 Reynard의 JIT 활성화는 설치 방식·iOS 버전에 따라 별도 설정이 필요합니다. JIT pairing/개발자 이미지(DDI) 설정은 브라우징 통신이 아니며, 기존 Reynard의 직접 로컬 연결·Apple 개발자 이미지 다운로드 경로를 유지합니다. 필요하다면 브라우징 전 설정하세요.
 
@@ -79,7 +79,7 @@ Reynard 및 이 overlay는 GPL-3.0, Gecko 수정사항은 MPL-2.0 (`LICENSE.fire
 
 ## Tor 사용 범위
 
-Settings → Tor 또는 상단 Tor 버튼에서 **항상 / 사생활 보호 탭만 / 사용 안 함**을 선택합니다. 기본값은 항상입니다. 변경은 다음 앱 실행에 적용되므로 앱을 완전히 종료하고 다시 실행하세요. 실행 중 탭·다운로드의 경로를 갑자기 바꾸지 않습니다.
+Settings → Privacy에 **Use Tor / Private Tabs Only / Block JavaScript** 토글이 있습니다. Use Tor만 켜면 모든 탭, Private Tabs Only도 켜면 개인 탭만 Tor를 사용하고, Use Tor를 끄면 모든 탭이 직접 연결됩니다. 앱 UI는 영어로 표시됩니다. 기본값은 항상입니다. 변경은 다음 앱 실행에 적용되므로 앱을 완전히 종료하고 다시 실행하세요. 실행 중 탭·다운로드의 경로를 갑자기 바꾸지 않습니다.
 
 | 설정 | 일반 탭 | 사생활 보호 탭 |
 |---|---|---|
@@ -88,3 +88,11 @@ Settings → Tor 또는 상단 Tor 버튼에서 **항상 / 사생활 보호 탭�
 | 사용 안 함 | 직접 연결 | 직접 연결 |
 
 직접 연결은 실제 IP를 노출할 수 있고 사생활 보호 탭도 IP를 숨기지는 않습니다. RFP·추적 방지·메모리 기록 정책은 그대로 유지합니다. 혼합 모드에서는 탭 출처를 확인할 수 없는 검색 제안·아이콘·메타데이터·네이티브 미리보기 및 일부 네이티브 다운로드를 차단합니다. 웹페이지와 Gecko를 통해 캡처되는 다운로드는 해당 탭 경로를 따르며, 미디어 artwork는 원래 세션의 개인 모드를 따릅니다. 알 수 없는 Gecko 채널은 Tor로 처리하고 Tor 오류 시 직접 연결로 우회하지 않습니다.
+
+
+## Relay information
+
+Open **Settings → Privacy → Tor Connection & Relays**, or tap the browser status button.
+The relay view shows built general-purpose circuits, with each relay's role (Guard / Middle / Exit), nickname, IP address and fingerprint. Circuits may be unused or belong to different sites; they are not attributed to the current tab. Onion-service and internal directory circuits are excluded rather than mislabeled as exit circuits. Missing IP metadata is shown as unavailable. Information is read through the authenticated local Tor controller only, is not persisted, refreshes every 10 seconds while the page is visible, and is cleared on pause or loss of Tor readiness. A 10-second timeout rejects late responses.
+
+The direct-routing implementation uses the pinned Gecko 157 proxy API with all eight `newProxyInfo` arguments. Older builds used a six-argument call that Gecko skipped, leaving SOCKS enabled for ordinary tabs and causing proxy-refused errors when Tor was off. Regression tests now enforce the real API signature and replacement of an existing SOCKS proxy. Changes still apply only after a full app restart.

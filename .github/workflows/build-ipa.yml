@@ -59,6 +59,10 @@ jobs:
           xcrun swiftc -typecheck -default-isolation MainActor -sdk "$(xcrun --sdk iphoneos --show-sdk-path)" -target arm64-apple-ios17.4 overlay/Reynard/Tor/TorNetwork.swift overlay/Reynard/Tor/TorPrivacy.swift
           swiftc overlay/Reynard/Tor/TorNetwork.swift overlay/Reynard/Tor/TorPrivacy.swift tests/native/main.swift -o /tmp/tor-proxy-check
           python3 scripts/test-native-proxy.py /tmp/tor-proxy-check
+      - name: Test relay filtering and formatting
+        run: |
+          xcrun clang -fobjc-arc -framework Foundation -Ioverlay/Reynard/Tor tests/relay-info.m -o /tmp/tor-relay-check
+          /tmp/tor-relay-check
       - name: Type-check Tor interface against UIKit
         run: |
           xcrun swiftc -typecheck -default-isolation MainActor -sdk "$(xcrun --sdk iphoneos --show-sdk-path)" -target arm64-apple-ios17.4 -import-objc-header overlay/Reynard/Tor/TorService.h overlay/Reynard/Tor/TorNetwork.swift overlay/Reynard/Tor/TorPrivacy.swift overlay/Reynard/Tor/TorStatusViewController.swift overlay/Reynard/Tor/TorBrowserStatus.swift tests/ios-stubs.swift
@@ -83,7 +87,9 @@ jobs:
           key: tor-ios-deps-v1-${{ runner.arch }}-${{ hashFiles('upstream.lock.json', 'Podfile') }}
           restore-keys: tor-ios-deps-v1-${{ runner.arch }}-
       - name: Apply Tor integration
-        run: python3 scripts/apply-overlay.py upstream browser
+        run: |
+          python3 scripts/apply-overlay.py upstream browser
+          python3 scripts/configure-privacy-ui.py upstream
       - name: Parse modified native stores and navigation policy
         run: |
           xcrun swiftc -frontend -parse -sdk "$(xcrun --sdk iphoneos --show-sdk-path)" -target arm64-apple-ios17.4 upstream/browser/Reynard/Client/Stores/{HistoryStore,TabManagementStore,NavigationHistoryStore,FaviconStore,SiteMetadataStore,SitePermissionStore}.swift upstream/browser/GeckoView/Delegates/NavigationDelegate.swift
@@ -191,3 +197,4 @@ jobs:
             Podfile.resolved.lock
           if-no-files-found: ignore
           retention-days: 7
+

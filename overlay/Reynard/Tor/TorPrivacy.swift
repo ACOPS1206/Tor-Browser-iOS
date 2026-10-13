@@ -6,9 +6,9 @@ enum TorPrivacy {
         case always, privateOnly, never
         var title: String {
             switch self {
-            case .always: return "항상 Tor 사용 / Always"
-            case .privateOnly: return "사생활 보호 탭만 / Private tabs only"
-            case .never: return "Tor 사용 안 함 / Never"
+            case .always: return "All Tabs"
+            case .privateOnly: return "Private Tabs Only"
+            case .never: return "Tor Off"
             }
         }
         func usesTor(isPrivate: Bool) -> Bool {
@@ -27,6 +27,8 @@ enum TorPrivacy {
     }
 
     static func prepareBeforeGecko() {
+        // Keep the browser interface in English, independent of the device language.
+        UserDefaults.standard.set(["en"], forKey: "AppleLanguages")
         // Read once at process startup. The engine locks this choice for the run.
         setenv("TBIO_DISABLE_JAVASCRIPT", disableJavaScript ? "1" : "0", 1)
         setenv("TBIO_ROUTING_MODE", activeRoutingMode.rawValue, 1)
@@ -42,4 +44,5 @@ enum TorPrivacy {
         }
     }
 }
+
 

@@ -30,6 +30,18 @@ class OverlayIntegrationTests(unittest.TestCase):
             modules.mkdir(parents=True, exist_ok=True)
             (modules / 'moz.build').write_text('EXTRA_JS_MODULES += [\n    "BrowserUsageTelemetry.sys.mjs",\n    "Messaging.sys.mjs",\n]\n')
             module.apply(target)
+            ui_spec = importlib.util.spec_from_file_location('privacy_ui', ROOT / 'scripts/configure-privacy-ui.py')
+            ui_module = importlib.util.module_from_spec(ui_spec)
+            ui_spec.loader.exec_module(ui_module)
+            ui_module.apply(target)
+            settings = (target / 'browser/Reynard/Client/Interface/Library/Settings/SettingsViewController.swift').read_text()
+            self.assertIn('return torPrivacySection.rowCount + privacySection.rowCount', settings)
+            self.assertIn('privacySection.cell(at: indexPath.row - torPrivacySection.rowCount)', settings)
+            self.assertIn('privacySection.selectRow(at: indexPath.row - torPrivacySection.rowCount', settings)
+            self.assertIn('footerTitle: TorPrivacySettingsSection.footer', settings)
+            self.assertNotIn('navigationItem.rightBarButtonItem = UIBarButtonItem(title: "Tor"', settings)
+            with self.assertRaises(RuntimeError):
+                ui_module.apply(target)
             prefs = json.loads((ROOT / 'privacy-prefs.json').read_text())
             for key, value in prefs.items():
                 self.assertIn(f'pref({json.dumps(key)}, {json.dumps(value)}, locked);', defaults.read_text())
@@ -65,4 +77,5 @@ class OverlayIntegrationTests(unittest.TestCase):
             # Applying twice must reject changed anchors, not silently produce a broken build.
             with self.assertRaises(RuntimeError):
                 module.apply(target)
+
 

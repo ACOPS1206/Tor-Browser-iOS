@@ -8,10 +8,22 @@ export function createTorChannelFilter(proxyService, newToken, proxyFlags, mode 
     applyFilter(channel, _previousProxy, callback) {
       // Direct routing is an explicit user policy, NEVER a Tor error fallback.
       // Unknown context stays on Tor in private-only mode.
-      let privateId;
+      let privateId, forcedPrivate;
       try { privateId = channel.loadInfo.originAttributes.privateBrowsingId; } catch {}
-      if (mode === "never" || (mode === "privateOnly" && privateId === 0)) {
-        callback.onProxyFilterResult(proxyService.newProxyInfo("direct", "", -1, 0, 0, null));
+      // Chrome-initiated loads may report privateBrowsingId=0 even when private
+      // browsing is forced. Never send those private loads directly.
+      try { forcedPrivate = channel.loadInfo.usePrivateBrowsing; } catch {}
+      if (mode === "never" || (mode === "privateOnly" && privateId === 0 && forcedPrivate !== true)) {
+        // Gecko 157 takes eight arguments; the legacy six-argument call throws
+        // and makes Gecko skip this filter, retaining the default SOCKS proxy.
+        try {
+          callback.onProxyFilterResult(proxyService.newProxyInfo(
+            "direct", "", -1, "", "", 0, 0, null
+          ));
+        } catch (error) {
+          channel.cancel(Cr.NS_ERROR_ABORT);
+          throw error;
+        }
         return;
       }
       let key;
@@ -61,4 +73,5 @@ export function installTorChannelIsolation() {
   installedFilter.QueryInterface = ChromeUtils.generateQI(["nsIProtocolProxyChannelFilter"]);
   proxyService.registerChannelFilter(installedFilter, 0xffffffff);
 }
+
 

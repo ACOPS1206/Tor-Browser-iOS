@@ -7,8 +7,11 @@ NS_ASSUME_NONNULL_BEGIN
 @property(nonatomic, readonly) NSInteger bootstrapProgress;
 @property(nonatomic, readonly) BOOL ready;
 @property(nonatomic, readonly) BOOL paused;
+@property(nonatomic, readonly) NSString *relayInfoText;
+- (void)refreshRelayInfo;
 - (void)start;
 - (void)pause;
 - (void)requestNewCircuit;
 @end
 NS_ASSUME_NONNULL_END
+

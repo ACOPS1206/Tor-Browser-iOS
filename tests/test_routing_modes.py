@@ -17,9 +17,9 @@ class RoutingModeTests(unittest.TestCase):
 
     def test_mode_change_requires_confirmation_and_warns_about_real_ip(self):
         source = (ROOT / 'overlay/Reynard/Tor/TorStatusViewController.swift').read_text()
-        self.assertIn('실제 IP 노출', source)
+        self.assertIn('real IP address', source)
         self.assertIn('preferredStyle: .alert', source)
-        self.assertIn('다음 앱 실행', source)
+        self.assertIn('after restarting the app', source)
 
     def test_never_does_not_start_tor_and_media_has_per_session_context(self):
         source = (ROOT / 'overlay/Reynard/Tor/TorService.m').read_text()
@@ -27,3 +27,4 @@ class RoutingModeTests(unittest.TestCase):
         source = (ROOT / 'scripts/apply-overlay.py').read_text()
         self.assertIn('TorNetwork.session(isPrivate: session.isPrivateMode)', source)
         self.assertIn('defaults.setBoolPref("network.dns.disabled"', source)
+
