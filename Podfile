@@ -21,11 +21,21 @@ post_install do |installer|
           #include "Reynard.xcconfig"
           #include "#{pods}"
           HEADER_SEARCH_PATHS = $(inherited) $(GECKO_DIST)/include $(GECKO_DIST)/include/GeckoView $(SRCROOT)/GeckoView "$(PODS_ROOT)/Headers/Public" "$(PODS_CONFIGURATION_BUILD_DIR)/Tor/Tor.framework/Headers"
+          // Link the C archive by path: Tor.framework and tor.framework collide
+          // on the case-insensitive macOS runner filesystem.
+          OTHER_LDFLAGS = $(inherited) "$(PODS_ROOT)/Tor/tor.xcframework/ios-arm64/tor.framework/tor"
           LIBRARY_SEARCH_PATHS = $(inherited) $(GECKO_DIST)/bin
           FRAMEWORK_SEARCH_PATHS = $(inherited) $(BUILT_PRODUCTS_DIR) "$(PODS_CONFIGURATION_BUILD_DIR)/Tor" "$(PODS_XCFRAMEWORKS_BUILD_DIR)/Tor"
         CONFIG
         config.base_configuration_reference = project.main_group.new_file(relative)
       end
+    end
+    # CocoaPods emits both -framework Tor (wrapper) and -framework tor (C).
+    # Remove the ambiguous C lookup; the app config links its exact archive.
+    aggregate.xcconfigs.each_key do |configuration|
+      path = aggregate.xcconfig_path(configuration)
+      source = File.read(path)
+      File.write(path, source.gsub(/-framework\s+"tor"(?=\s|$)/, ''))
     end
     project.save
   end
