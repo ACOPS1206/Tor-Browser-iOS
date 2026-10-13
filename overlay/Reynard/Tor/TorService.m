@@ -1,4 +1,6 @@
 #import "TorService.h"
+#include <stdlib.h>
+#include <string.h>
 #import <Tor/TORConfiguration.h>
 #import <Tor/TORController.h>
 #import <Tor/TORThread.h>
@@ -30,6 +32,13 @@
 }
 - (void)start {
     NSAssert(NSThread.isMainThread, @"Start Tor on main thread");
+    const char *mode = getenv("TBIO_ROUTING_MODE");
+    if (mode && strcmp(mode, "never") == 0) {
+        self.ready = NO;
+        self.statusText = @"Tor 꺼짐 — 직접 연결 / Tor off — direct connection";
+        [self publish];
+        return;
+    }
     if (self.torThread) {
         if (self.paused && self.authenticated) {
             [self.controller setConfForKey:@"DisableNetwork" withValue:@"0" completion:^(BOOL success, NSError *error) {
@@ -138,3 +147,4 @@
     }];
 }
 @end
+

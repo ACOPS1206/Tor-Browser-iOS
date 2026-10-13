@@ -21,8 +21,9 @@ extension BrowserViewController {
     }
     @objc private func updateTorStatusButton() {
         guard let button = view.viewWithTag(19050) as? UIButton else { return }
-        button.setTitle(TBIOTorService.shared.statusText, for: .normal)
-        button.setTitleColor(TBIOTorService.shared.ready ? .systemGreen : .systemOrange, for: .normal)
+        let prefix = TorPrivacy.activeRoutingMode == .privateOnly ? "개인 탭만 Tor / Private-only · " : ""
+        button.setTitle(prefix + TBIOTorService.shared.statusText, for: .normal)
+        button.setTitleColor(TBIOTorService.shared.ready && TorPrivacy.activeRoutingMode == .always ? .systemGreen : .systemOrange, for: .normal)
         view.bringSubviewToFront(button)
     }
     @objc private func openTorStatus() {
@@ -32,3 +33,4 @@ extension BrowserViewController {
     }
     @objc private func closeTorStatus() { dismiss(animated: true) }
 }
+

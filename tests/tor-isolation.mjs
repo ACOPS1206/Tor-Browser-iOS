@@ -39,3 +39,27 @@ assert.throws(() => failing.applyFilter({ cancel(status) {
 } }, null, { onProxyFilterResult() { assert.fail("Unexpected fallback"); } }));
 assert.ok(cancelled);
 console.log("Tor channel isolation: 10 cases passed");
+
+const routingService = {
+  newProxyInfoWithAuth(...args) { return args; },
+  newProxyInfo(...args) { return args; },
+};
+function policy(mode, privateId) {
+  const route = createTorChannelFilter(routingService, () => "token", 1, mode);
+  let result;
+  route.applyFilter({ loadInfo: { originAttributes: { privateBrowsingId: privateId,
+    firstPartyDomain: "same.example", userContextId: 0 } } }, null,
+    { onProxyFilterResult(p) { result = p; } });
+  return result[0];
+}
+assert.equal(policy("always", 0), "socks");
+assert.equal(policy("always", 1), "socks");
+assert.equal(policy("privateOnly", 0), "direct");
+assert.equal(policy("privateOnly", 1), "socks");
+assert.equal(policy("privateOnly", undefined), "socks");
+assert.equal(policy("never", 0), "direct");
+assert.equal(policy("never", 1), "direct");
+assert.equal(policy("invalid", 0), "socks");
+assert.equal(policy("", 0), "socks");
+console.log("Tor routing mode matrix: 9 cases passed");
+

@@ -110,7 +110,8 @@ def apply(target, browser_only=False):
     replace(app / 'Resources/Info.plist', '<string>com.minh-ton.Reynard</string>', '<string>com.acops1206.TorBrowserIOS</string>')
     replace(app / 'SceneDelegate.swift', 'scheme == "reynard"', 'scheme == "onionreynard"')
     replace(browser / 'Extensions/OpenIn/OpenInViewController.swift', 'reynard://open', 'onionreynard://open')
-    replace(app / 'Client/SessionManagement/SessionManager.swift', 'isPrivateMode: isPrivate,', 'isPrivateMode: true, // Always use private Gecko storage.')
+    replace(app / 'Client/SessionManagement/SessionManager.swift', 'isPrivateMode: isPrivate,',
+        'isPrivateMode: TorPrivacy.activeRoutingMode == .always || isPrivate,')
     settings = app / 'Client/Interface/Library/Settings/SettingsViewController.swift'
     replace(settings, '        observeJITMode()', '        navigationItem.rightBarButtonItem = UIBarButtonItem(title: "Tor", style: .plain, target: self, action: #selector(showEmbeddedTor))\n        observeJITMode()')
     # A permanent visible status button, including while connecting or paused.
@@ -122,6 +123,9 @@ def apply(target, browser_only=False):
         replace(app / relative, 'URLSessionConfiguration.default', 'TorNetwork.configuration()')
     for relative in ['Client/Interface/ContextMenu/ImagePreview/ImagePreviewLoader.swift', 'Client/SessionManagement/Media/SystemMediaSession.swift']:
         replace(app / relative, 'URLSession.shared', 'TorNetwork.session')
+    replace(app / 'Client/SessionManagement/Media/SystemMediaSession.swift',
+        'TorNetwork.session.dataTask(with: artworkURL)',
+        'TorNetwork.session(isPrivate: session.isPrivateMode).dataTask(with: artworkURL)')
     replace(app / 'Client/Search/SearchCompletion.swift', 'urlSession: URLSession = .shared', 'urlSession: URLSession = TorNetwork.session')
     replace(app / 'Client/Interface/Library/Settings/Sections/Updates/UpdatesSettingsSection.swift', 'URLSession(configuration: .default)', 'URLSession(configuration: TorNetwork.configuration())')
     # Persisted bridge/engine settings cannot change immutable Tor networking defaults.
@@ -170,7 +174,12 @@ def apply_engine(target):
         startup = engine / 'mobile/shared/components/geckoview/GeckoViewStartup.sys.mjs'
         locks = '\n'.join('        Services.prefs.lockPref(' + json.dumps(key) + ');' for key in prefs)
         policy = '''
+        const routingMode = Services.env.get("TBIO_ROUTING_MODE");
         const defaults = Services.prefs.getDefaultBranch("");
+        // Keep ordinary tabs available for selective/no-Tor routing.
+        defaults.setBoolPref("browser.privatebrowsing.autostart", !["privateOnly", "never"].includes(routingMode));
+        // Selected Tor channels still use SOCKS hostname resolution.
+        defaults.setBoolPref("network.dns.disabled", !["privateOnly", "never"].includes(routingMode));
         defaults.setBoolPref("javascript.enabled", Services.env.get("TBIO_DISABLE_JAVASCRIPT") !== "1");
         Services.prefs.lockPref("javascript.enabled");
         ChromeUtils.importESModule("resource://gre/modules/TBIOPrivacy.sys.mjs").installTorChannelIsolation();'''
@@ -188,3 +197,4 @@ if __name__ == '__main__':
         apply(target, browser_only=phase == 'browser')
     else:
         raise SystemExit('Phase must be all, browser, or engine')
+

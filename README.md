@@ -76,3 +76,15 @@ cd ..
 ## License / 출처
 
 Reynard 및 이 overlay는 GPL-3.0, Gecko 수정사항은 MPL-2.0 (`LICENSE.firefox`). Tor.framework는 MIT이며 포함 라이브러리의 라이선스도 적용됩니다. [Reynard](https://github.com/minh-ton/reynard-browser), [Tor.framework](https://github.com/iCepa/Tor.framework), [Orbot](https://github.com/guardianproject/orbot-apple), [Tor Project](https://www.torproject.org/)에 감사드립니다. 공식 Tor Browser 브랜드/보증을 주장하지 않습니다.
+
+## Tor 사용 범위
+
+Settings → Tor 또는 상단 Tor 버튼에서 **항상 / 사생활 보호 탭만 / 사용 안 함**을 선택합니다. 기본값은 항상입니다. 변경은 다음 앱 실행에 적용되므로 앱을 완전히 종료하고 다시 실행하세요. 실행 중 탭·다운로드의 경로를 갑자기 바꾸지 않습니다.
+
+| 설정 | 일반 탭 | 사생활 보호 탭 |
+|---|---|---|
+| 항상 | Tor | Tor |
+| 사생활 보호 탭만 | 직접 연결 | Tor |
+| 사용 안 함 | 직접 연결 | 직접 연결 |
+
+직접 연결은 실제 IP를 노출할 수 있고 사생활 보호 탭도 IP를 숨기지는 않습니다. RFP·추적 방지·메모리 기록 정책은 그대로 유지합니다. 혼합 모드에서는 탭 출처를 확인할 수 없는 검색 제안·아이콘·메타데이터·네이티브 미리보기 및 일부 네이티브 다운로드를 차단합니다. 웹페이지와 Gecko를 통해 캡처되는 다운로드는 해당 탭 경로를 따르며, 미디어 artwork는 원래 세션의 개인 모드를 따릅니다. 알 수 없는 Gecko 채널은 Tor로 처리하고 Tor 오류 시 직접 연결로 우회하지 않습니다.

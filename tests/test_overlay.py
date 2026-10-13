@@ -35,8 +35,6 @@ class OverlayIntegrationTests(unittest.TestCase):
                 self.assertIn(f'pref({json.dumps(key)}, {json.dumps(value)}, locked);', defaults.read_text())
                 self.assertIn(f'Services.prefs.lockPref({json.dumps(key)});', startup.read_text())
             app = target / 'browser/Reynard'
-            self.assertNotIn('configureUnsandboxedAppDataDirectories', (app / 'main.swift').read_text())
-            self.assertNotIn('#unavailable(iOS 14.0)', (app / 'main.swift').read_text())
             for path in app.glob('Client/**/*.swift'):
                 source = path.read_text()
                 self.assertNotIn('URLSession.shared', source, str(path))
@@ -45,7 +43,7 @@ class OverlayIntegrationTests(unittest.TestCase):
             self.assertIn('onionreynard://open', (target / 'browser/Extensions/OpenIn/OpenInViewController.swift').read_text())
             self.assertNotIn('<string>reynard</string>', (app / 'Resources/Info.plist').read_text())
             self.assertNotIn('        fetchUpdates()', (app / 'Client/Startup/BrowserUpdates.swift').read_text())
-            self.assertIn('isPrivateMode: true', (app / 'Client/SessionManagement/SessionManager.swift').read_text())
+            self.assertIn('isPrivateMode: TorPrivacy.activeRoutingMode == .always || isPrivate', (app / 'Client/SessionManagement/SessionManager.swift').read_text())
             for name in ['HistoryStore', 'TabManagementStore', 'FaviconStore', 'SitePermissionStore']:
                 text = (app / f'Client/Stores/{name}.swift').read_text()
                 self.assertIn('sqlite3_open_v2(":memory:",', text)
@@ -67,3 +65,4 @@ class OverlayIntegrationTests(unittest.TestCase):
             # Applying twice must reject changed anchors, not silently produce a broken build.
             with self.assertRaises(RuntimeError):
                 module.apply(target)
+

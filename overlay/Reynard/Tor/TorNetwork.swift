@@ -5,8 +5,30 @@ import Network
 /// Tor unavailable -> request fails. There is no direct fallback or bypass domain.
 enum TorNetwork {
     static let session = URLSession(configuration: configuration())
-    static func configuration() -> URLSessionConfiguration {
+    static let privateSession = URLSession(configuration: configuration(isPrivate: true))
+    static let normalSession = URLSession(configuration: configuration(isPrivate: false))
+    static func session(isPrivate: Bool) -> URLSession {
+        isPrivate ? privateSession : normalSession
+    }
+    static func configuration(isPrivate: Bool? = nil) -> URLSessionConfiguration {
         let configuration = URLSessionConfiguration.ephemeral
+        configuration.urlCache = nil
+        configuration.httpCookieStorage = nil
+        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+        configuration.timeoutIntervalForRequest = 90
+        configuration.timeoutIntervalForResource = 600
+        let mode = TorPrivacy.activeRoutingMode
+        // Shared stores have no trustworthy originating tab. In mixed mode,
+        // suppress their auxiliary HTTP requests instead of guessing a route.
+        if mode == .privateOnly && isPrivate == nil {
+            configuration.protocolClasses = [TorUnknownContextBlocker.self]
+            return configuration
+        }
+        if !mode.usesTor(isPrivate: isPrivate ?? true) {
+            configuration.proxyConfigurations = []
+            configuration.connectionProxyDictionary = [:]
+            return configuration
+        }
         let endpoint = NWEndpoint.hostPort(host: .ipv4(IPv4Address("127.0.0.1")!), port: NWEndpoint.Port(rawValue: 19050)!)
         var proxy = ProxyConfiguration(socksv5Proxy: endpoint)
         proxy.allowFailover = false
@@ -20,6 +42,22 @@ enum TorNetwork {
         configuration.timeoutIntervalForResource = 600
         return configuration
     }
+}
+
+nonisolated final class TorUnknownContextBlocker: URLProtocol {
+    override class func canInit(with request: URLRequest) -> Bool {
+        ["http", "https"].contains(request.url?.scheme?.lowercased() ?? "")
+    }
+    override class func canInit(with task: URLSessionTask) -> Bool {
+        guard let request = task.currentRequest ?? task.originalRequest else { return false }
+        return canInit(with: request)
+    }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        client?.urlProtocol(self, didFailWithError: URLError(.unsupportedURL,
+            userInfo: [NSLocalizedDescriptionKey: "Auxiliary request blocked: private/normal tab context is unknown."]))
+    }
+    override func stopLoading() {}
 }
 
 /// CFNetwork can bypass even an explicit SOCKS proxy for loopback destinations.
@@ -47,3 +85,4 @@ nonisolated final class TorLocalAddressBlocker: URLProtocol {
     }
     override func stopLoading() {}
 }
+

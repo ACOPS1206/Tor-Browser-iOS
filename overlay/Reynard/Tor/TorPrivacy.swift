@@ -2,6 +2,25 @@ import Foundation
 import Darwin
 
 enum TorPrivacy {
+    enum RoutingMode: String, CaseIterable {
+        case always, privateOnly, never
+        var title: String {
+            switch self {
+            case .always: return "항상 Tor 사용 / Always"
+            case .privateOnly: return "사생활 보호 탭만 / Private tabs only"
+            case .never: return "Tor 사용 안 함 / Never"
+            }
+        }
+        func usesTor(isPrivate: Bool) -> Bool {
+            self == .always || (self == .privateOnly && isPrivate)
+        }
+    }
+    static var routingMode: RoutingMode {
+        get { RoutingMode(rawValue: UserDefaults.standard.string(forKey: "TBIO.RoutingMode") ?? "") ?? .always }
+        set { UserDefaults.standard.set(newValue.rawValue, forKey: "TBIO.RoutingMode") }
+    }
+    // Immutable for this process: do not reroute live tabs/downloads after a UI change.
+    static let activeRoutingMode = routingMode
     static var disableJavaScript: Bool {
         get { UserDefaults.standard.bool(forKey: "TBIO.DisableJavaScript") }
         set { UserDefaults.standard.set(newValue, forKey: "TBIO.DisableJavaScript") }
@@ -10,6 +29,7 @@ enum TorPrivacy {
     static func prepareBeforeGecko() {
         // Read once at process startup. The engine locks this choice for the run.
         setenv("TBIO_DISABLE_JAVASCRIPT", disableJavaScript ? "1" : "0", 1)
+        setenv("TBIO_ROUTING_MODE", activeRoutingMode.rawValue, 1)
         // Remove legacy automatic browsing records, preserving bookmarks,
         // explicit downloads, preferences, JIT pairing and Tor guard state.
         guard let base = FileManager.default.urls(for: .applicationSupportDirectory,
@@ -22,3 +42,4 @@ enum TorPrivacy {
         }
     }
 }
+

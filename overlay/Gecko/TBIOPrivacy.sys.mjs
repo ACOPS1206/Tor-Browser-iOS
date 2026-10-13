@@ -1,10 +1,19 @@
 /* SPDX-License-Identifier: MPL-2.0 */
 // Parent-process channel policy. Credentials are random, never domain names,
 // and never persisted. FPI supplies the top-level firstPartyDomain for frames.
-export function createTorChannelFilter(proxyService, newToken, proxyFlags) {
+export function createTorChannelFilter(proxyService, newToken, proxyFlags, mode = "always") {
+  if (!["always", "privateOnly", "never"].includes(mode)) mode = "always";
   const credentials = new Map();
   return {
     applyFilter(channel, _previousProxy, callback) {
+      // Direct routing is an explicit user policy, NEVER a Tor error fallback.
+      // Unknown context stays on Tor in private-only mode.
+      let privateId;
+      try { privateId = channel.loadInfo.originAttributes.privateBrowsingId; } catch {}
+      if (mode === "never" || (mode === "privateOnly" && privateId === 0)) {
+        callback.onProxyFilterResult(proxyService.newProxyInfo("direct", "", -1, 0, 0, null));
+        return;
+      }
       let key;
       try {
         const attributes = channel.loadInfo.originAttributes;
@@ -47,7 +56,9 @@ export function installTorChannelIsolation() {
     .getService(Ci.nsIProtocolProxyService);
   const newToken = () => Services.uuid.generateUUID().toString().slice(1, -1);
   installedFilter = createTorChannelFilter(proxyService, newToken,
-    Ci.nsIProxyInfo.TRANSPARENT_PROXY_RESOLVES_HOST);
+    Ci.nsIProxyInfo.TRANSPARENT_PROXY_RESOLVES_HOST,
+    Services.env.get("TBIO_ROUTING_MODE"));
   installedFilter.QueryInterface = ChromeUtils.generateQI(["nsIProtocolProxyChannelFilter"]);
   proxyService.registerChannelFilter(installedFilter, 0xffffffff);
 }
+
