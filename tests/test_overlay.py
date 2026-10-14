@@ -68,6 +68,17 @@ class OverlayIntegrationTests(unittest.TestCase):
                 self.assertNotIn('Data(contentsOf:', text)
             self.assertIn('installTorChannelIsolation()', startup.read_text())
             self.assertIn('configureTorStartupPreferences(Services)', startup.read_text())
+            completion_source = (app / 'Client/Search/SearchCompletion.swift').read_text()
+            start = completion_source.index('func fetchCompletions(')
+            body = completion_source[start:completion_source.index('\n}\n', start)]
+            self.assertIn('completion([])', body)
+            self.assertNotIn('dataTask', body)
+            self.assertNotIn('provider.url', body)
+            self.assertIn('TBIO:TorState', (app / 'Client/Interface/BrowserViewController.swift').read_text())
+            copy_gecko = (target / 'browser/Scripts/AddGecko.sh').read_text()
+            self.assertLess(copy_gecko.index('CompactGeckoResources.py'), copy_gecko.index('# sign the GeckoView.framework'))
+            engine_build = (target / 'tools/development/build-gecko.sh').read_text()
+            self.assertIn('--disable-proxy-direct-failover', engine_build)
             self.assertTrue((modules / 'TBIOPrivacy.sys.mjs').exists())
             # Python syntax alone accepts unsorted lists, but mozbuild rejects them.
             manifest = ast.parse((modules / 'moz.build').read_text())

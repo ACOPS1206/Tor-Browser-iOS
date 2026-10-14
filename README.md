@@ -106,3 +106,8 @@ Run the local regressions with `python -m unittest discover -s tests -v`,
 `tests/runtime/` contains opt-in, non-persisting browser probes; their availability
 does not mean they have passed in Gecko or on iPhone. No workflow change is needed.
 
+The [applied Android-reference improvements](docs/ANDROID_IMPROVEMENTS.md)
+document new request gating, bounded connection status, build-time proxy
+hardening, disabled remote search suggestions and pre-sign resource compaction,
+with their device/runtime validation limits.
+

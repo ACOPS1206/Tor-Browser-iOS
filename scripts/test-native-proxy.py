@@ -77,6 +77,7 @@ for prefix in ['', 'download-']:
     assert not thread.is_alive(), 'Proxy test did not terminate'
     # The SOCKS listener is now gone. No direct fallback may reach any origin.
     subprocess.run([binary, prefix + 'failure'], check=True, timeout=25)
+    subprocess.run([binary, prefix + 'gateclosed'], check=True, timeout=25)
     for phase in ['local', 'short-ip', 'octal-ip', 'hex-ip']:
         subprocess.run([binary, prefix + phase], check=True, timeout=25)
     redirect_thread = threading.Thread(target=proxy, args=(listener(19050), True), daemon=True)
@@ -86,3 +87,4 @@ for prefix in ['', 'download-']:
     assert not errors, errors
     assert not direct_hits, 'Native request or redirect bypassed Tor proxy'
 print('Data/download remote DNS, no-direct-fallback, local address and redirect checks passed')
+

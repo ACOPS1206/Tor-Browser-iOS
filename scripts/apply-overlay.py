@@ -76,6 +76,18 @@ def apply(target, browser_only=False):
     prefs = json.loads((ROOT / 'privacy-prefs.json').read_text())
     shutil.copytree(ROOT / 'overlay/Reynard/Tor', app / 'Tor', dirs_exist_ok=True)
     shutil.copy2(ROOT / 'Podfile', browser / 'Podfile')
+    shutil.copy2(ROOT / 'scripts/compact-gecko-resources.py', browser / 'Scripts/CompactGeckoResources.py')
+    resources = browser / 'Scripts/AddGecko.sh'
+    replace(resources, '# default theme missing error fix', '''# Compact the copied resources, before signing; do not alter cached engine dist.
+if [ -f "${GECKOVIEW_FW_FRAMEWORKS}/omni.ja" ]; then
+    python3 "${SRCROOT}/Scripts/CompactGeckoResources.py" "${GECKOVIEW_FW_FRAMEWORKS}/omni.ja"
+fi
+
+# default theme missing error fix''')
+    build_engine = target / 'tools/development/build-gecko.sh'
+    replace(build_engine, '\techo "ac_add_options --disable-tests"', '''\techo "ac_add_options --disable-tests"
+\techo "ac_add_options --enable-proxy-bypass-protection"
+\techo "ac_add_options --disable-proxy-direct-failover"''')
     replace(app / 'Bridging/Reynard-Bridging-Header.h', '#import "ExtensionBridge.h"', '#import "TorService.h"\n#import "ExtensionBridge.h"')
     replace(app / 'main.swift', 'GeckoRuntime.main(argc:', 'TorPrivacy.prepareBeforeGecko()\nTBIOTorService.shared.start()\n\nGeckoRuntime.main(argc:')
     # The fork requires iOS 17.4; remove upstream's obsolete iOS 13 path.
@@ -117,7 +129,11 @@ def apply(target, browser_only=False):
     replace(settings, '        observeJITMode()', '        navigationItem.rightBarButtonItem = UIBarButtonItem(title: "Tor", style: .plain, target: self, action: #selector(showEmbeddedTor))\n        observeJITMode()')
     # A permanent visible status button, including while connecting or paused.
     vc = app / 'Client/Interface/BrowserViewController.swift'
-    replace(vc, '        configureBrowserInterface()', '        configureBrowserInterface()\n        installTorStatusButton()')
+    replace(vc, '        configureBrowserInterface()', '''        configureBrowserInterface()
+        TorPrivacy.engineGatePublisher = { permitted in
+            GeckoRuntime.dispatchEvent(type: "TBIO:TorState", message: ["permitted": permitted])
+        }
+        installTorStatusButton()''')
     delegate = app / 'Client/Interface/BrowserViewController+TabManager.swift'
     for signature in [
         'func tabManagerDidChangeTabs(_ tabManager: TabManager)',
@@ -135,6 +151,11 @@ def apply(target, browser_only=False):
         'TorNetwork.session.dataTask(with: artworkURL)',
         'TorNetwork.session(isPrivate: session.isPrivateMode).dataTask(with: artworkURL)')
     replace(app / 'Client/Search/SearchCompletion.swift', 'urlSession: URLSession = .shared', 'urlSession: URLSession = TorNetwork.session')
+    replace_swift_body(app / 'Client/Search/SearchCompletion.swift',
+        'func fetchCompletions(', '''        // Remote suggestions disclose text before an explicit search.
+        // Keep local history/bookmark suggestions in their existing providers.
+        completion([])
+        return nil''')
     replace(app / 'Client/Interface/Library/Settings/Sections/Updates/UpdatesSettingsSection.swift', 'URLSession(configuration: .default)', 'URLSession(configuration: TorNetwork.configuration())')
     # Persisted bridge/engine settings cannot change immutable Tor networking defaults.
     runtime = browser / 'GeckoView/Runtime/GeckoRuntime.swift'
@@ -168,6 +189,10 @@ def apply_engine(target):
     prefs = json.loads((ROOT / 'privacy-prefs.json').read_text())
     # Bake proxy prefs into Gecko before startup networking, not after first tab creation.
     engine = target / 'engine/firefox'
+    configure = (engine / 'toolkit/moz.configure').read_text()
+    for option in ['--enable-proxy-bypass-protection', '--disable-proxy-direct-failover']:
+        if '"' + option + '"' not in configure:
+            raise RuntimeError('Pinned Gecko does not support required option: ' + option)
     spec = importlib.util.spec_from_file_location('fingerprinting_policy', ROOT / 'scripts/fingerprinting-policy.py')
     fingerprinting = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(fingerprinting)

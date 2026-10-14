@@ -1,9 +1,40 @@
 import Foundation
 import Network
 
+/// URLProtocol callbacks may run outside MainActor. Read gate state under a lock.
+nonisolated final class TorRequestGate: @unchecked Sendable {
+    static let shared = TorRequestGate()
+    private let lock = NSLock()
+    private var permitted = false
+    func allowsRequests() -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        return permitted
+    }
+    @discardableResult func update(permitted: Bool) -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        let changed = self.permitted != permitted
+        self.permitted = permitted
+        return changed
+    }
+}
+
 /// Every browser-owned Foundation request uses SOCKS, including redirects and downloads.
 /// Tor unavailable -> request fails. There is no direct fallback or bypass domain.
 enum TorNetwork {
+    static func applyTorClientState(permitted: Bool) {
+        let changed = TorRequestGate.shared.update(permitted: permitted)
+        guard changed && !permitted else { return }
+        let mode = TorPrivacy.activeRoutingMode
+        guard mode != .never else { return }
+        let sessions = mode == .always ? [session, privateSession, normalSession] : [privateSession]
+        for session in sessions {
+            session.getAllTasks { tasks in
+                // A delayed enumeration must not cancel requests after resume.
+                guard !TorRequestGate.shared.allowsRequests() else { return }
+                for task in tasks { task.cancel() }
+            }
+        }
+    }
     static let session = URLSession(configuration: configuration())
     static let privateSession = URLSession(configuration: configuration(isPrivate: true))
     static let normalSession = URLSession(configuration: configuration(isPrivate: false))
@@ -34,7 +65,7 @@ enum TorNetwork {
         proxy.allowFailover = false
         proxy.excludedDomains = []
         configuration.proxyConfigurations = [proxy]
-        configuration.protocolClasses = [TorLocalAddressBlocker.self]
+        configuration.protocolClasses = [TorUnavailableBlocker.self, TorLocalAddressBlocker.self]
         configuration.urlCache = nil
         configuration.httpCookieStorage = nil
         configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
@@ -42,6 +73,23 @@ enum TorNetwork {
         configuration.timeoutIntervalForResource = 600
         return configuration
     }
+}
+
+nonisolated final class TorUnavailableBlocker: URLProtocol {
+    override class func canInit(with request: URLRequest) -> Bool {
+        ["http", "https"].contains(request.url?.scheme?.lowercased() ?? "") &&
+            !TorRequestGate.shared.allowsRequests()
+    }
+    override class func canInit(with task: URLSessionTask) -> Bool {
+        guard let request = task.currentRequest ?? task.originalRequest else { return false }
+        return canInit(with: request)
+    }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        client?.urlProtocol(self, didFailWithError: URLError(.notConnectedToInternet,
+            userInfo: [NSLocalizedDescriptionKey: "Tor is unavailable or paused. Request blocked."]))
+    }
+    override func stopLoading() {}
 }
 
 nonisolated final class TorUnknownContextBlocker: URLProtocol {
@@ -85,4 +133,5 @@ nonisolated final class TorLocalAddressBlocker: URLProtocol {
     }
     override func stopLoading() {}
 }
+
 

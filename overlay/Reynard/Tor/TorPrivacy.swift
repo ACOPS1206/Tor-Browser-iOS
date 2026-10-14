@@ -21,6 +21,9 @@ enum TorPrivacy {
     }
     // Immutable for this process: do not reroute live tabs/downloads after a UI change.
     static let activeRoutingMode = routingMode
+    // Installed by the browser host after Gecko has initialized. Each client
+    // status publication retries delivery, including after initial startup.
+    static var engineGatePublisher: ((Bool) -> Void)?
     static var disableJavaScript: Bool {
         get { UserDefaults.standard.bool(forKey: "TBIO.DisableJavaScript") }
         set { UserDefaults.standard.set(newValue, forKey: "TBIO.DisableJavaScript") }
@@ -44,5 +47,6 @@ enum TorPrivacy {
         }
     }
 }
+
 
 

@@ -1,5 +1,9 @@
 # Tor-iOS privacy review — 2026-10-14
 
+후속 적용 내용은 [Android 참고 개선 보고서](ANDROID_IMPROVEMENTS.md)를 참조하세요.
+아래 내용은 첫 검토 시점의 기록이며, 후속 변경에서 새 요청 gate와 상태 타임아웃,
+엔진 failover 빌드 옵션 및 리소스 압축을 추가했습니다.
+
 Base: `01e1897f4042961fdada3cf32043f04447fea952`. Reynard:
 `ddaacd18b8c5661d495acfc0f3e90a86c484e64d`. Gecko: `FIREFOX_157_0_1_RELEASE`.
 

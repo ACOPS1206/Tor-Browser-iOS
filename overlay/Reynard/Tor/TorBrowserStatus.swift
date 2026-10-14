@@ -20,6 +20,9 @@ extension BrowserViewController {
         updateTorStatusButton()
     }
     @objc func updateTorStatusButton() {
+        let permitted = TBIOTorService.shared.ready && !TBIOTorService.shared.paused
+        TorNetwork.applyTorClientState(permitted: permitted)
+        TorPrivacy.engineGatePublisher?(permitted)
         guard let button = view.viewWithTag(19050) as? UIButton else { return }
         guard let session = tabManager.selectedTab?.session else {
             button.setTitle("No Tab · Tor Client: " + TBIOTorService.shared.statusText, for: .normal)

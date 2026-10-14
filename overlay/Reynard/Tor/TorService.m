@@ -1,5 +1,6 @@
 #import "TorService.h"
 #import "TorRelayInfo.h"
+#import "TorStatusPoll.h"
 #include <stdlib.h>
 #include <string.h>
 #import <Tor/TORConfiguration.h>
@@ -21,6 +22,13 @@
 @property(nonatomic) NSString *relayInfoText;
 @property(nonatomic) BOOL relayQueryPending;
 @property(nonatomic) NSUInteger relayGeneration;
+@property(nonatomic) TBIOStatusPoll statusPoll;
+@property(nonatomic) NSUInteger authenticationGeneration;
+@property(nonatomic) NSUInteger networkCommandGeneration;
+@property(nonatomic) NSString *connectionStage;
+@property(nonatomic) NSString *publishedStage;
+@property(nonatomic) NSInteger publishedProgress;
+@property(nonatomic) BOOL publishedReady;
 @end
 
 @implementation TBIOTorService
@@ -37,22 +45,77 @@
         self.relayQueryPending = NO;
         self.relayInfoText = self.paused ? @"Tor is paused. Relay information is unavailable." : @"Connect to Tor to view relays.";
     }
-    [NSNotificationCenter.defaultCenter postNotificationName:@"TBIO.TorStatus" object:self];
+    NSDictionary *state = @{@"stage": self.connectionStage ?: @"initial",
+        @"progress": @(self.bootstrapProgress), @"ready": @(self.ready && !self.paused)};
+    if (![self.publishedStage isEqualToString:state[@"stage"]]) {
+        self.publishedStage = state[@"stage"];
+        [NSNotificationCenter.defaultCenter postNotificationName:@"TBIO.TorStage" object:self userInfo:state];
+    }
+    if (self.publishedProgress != self.bootstrapProgress) {
+        self.publishedProgress = self.bootstrapProgress;
+        [NSNotificationCenter.defaultCenter postNotificationName:@"TBIO.TorProgress" object:self userInfo:state];
+    }
+    if (self.publishedReady != self.ready) {
+        self.publishedReady = self.ready;
+        [NSNotificationCenter.defaultCenter postNotificationName:@"TBIO.TorReady" object:self userInfo:state];
+    }
+    [NSNotificationCenter.defaultCenter postNotificationName:@"TBIO.TorStatus" object:self userInfo:state];
+}
+- (void)invalidateStatusPoll {
+    TBIOStatusPoll state = self.statusPoll;
+    TBIOPollInvalidate(&state);
+    self.statusPoll = state;
+    self.ready = NO;
+}
+- (void)statusUnavailable {
+    [self invalidateStatusPoll];
+    self.connectionStage = @"unavailable";
+    self.bootstrapProgress = 0;
+    self.statusText = @"Tor status unavailable — new requests blocked";
+    self.authenticated = NO;
+    self.authenticating = NO;
+    self.authenticationGeneration++;
+    [self.controller disconnect];
+    self.controller = nil;
+    [self publish];
 }
 - (void)start {
     NSAssert(NSThread.isMainThread, @"Start Tor on main thread");
     const char *mode = getenv("TBIO_ROUTING_MODE");
     if (mode && strcmp(mode, "never") == 0) {
         self.ready = NO;
+        self.connectionStage = @"off";
         self.statusText = @"Tor off — direct connection";
         [self publish];
         return;
     }
     if (self.torThread) {
+        if (self.paused && !self.authenticated) {
+            self.networkCommandGeneration++;
+            self.authenticationGeneration++;
+            self.authenticating = NO;
+            [self.controller disconnect];
+            self.controller = nil;
+            self.paused = NO;
+            self.connectionStage = @"connecting";
+            self.statusText = @"Reconnecting";
+            [self publish];
+            return;
+        }
         if (self.paused && self.authenticated) {
+            NSUInteger generation = ++self.networkCommandGeneration;
+            TORController *controller = self.controller;
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 10 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+                if (generation == self.networkCommandGeneration && self.paused) {
+                    self.networkCommandGeneration++;
+                    [self statusUnavailable];
+                }
+            });
             [self.controller setConfForKey:@"DisableNetwork" withValue:@"0" completion:^(BOOL success, NSError *error) {
                 dispatch_async(dispatch_get_main_queue(), ^{
-                    if (success) { self.paused = NO; self.statusText = @"Reconnecting"; }
+                    if (generation != self.networkCommandGeneration || controller != self.controller) return;
+                    self.networkCommandGeneration++;
+                    if (success) { self.paused = NO; self.connectionStage = @"connecting"; self.statusText = @"Reconnecting"; }
                     else { self.statusText = @"Resume failed"; }
                     [self publish];
                 });
@@ -87,12 +150,16 @@
     self.torThread = [[TORThread alloc] initWithConfiguration:config];
     [self.torThread start];
     self.statusText = @"Starting";
+    self.connectionStage = @"starting";
     self.timer = [NSTimer scheduledTimerWithTimeInterval:1.0 target:self selector:@selector(tick:) userInfo:nil repeats:YES];
     [self publish];
 }
 - (void)tick:(NSTimer *)timer {
     if (self.paused) return;
     if (self.torThread.isFinished) {
+        [self invalidateStatusPoll];
+        self.authenticationGeneration++;
+        self.connectionStage = @"stopped";
         self.ready = NO; self.statusText = @"Tor stopped; restart app";
         [timer invalidate]; [self publish]; return;
     }
@@ -111,27 +178,77 @@
         NSInteger port = [[controlLine substringWithRange:[address rangeAtIndex:1]] integerValue];
         if (port < 1 || port > 65535) return;
         self.authenticating = YES;
+        self.connectionStage = @"authenticating";
         // Control socket connection is local only; no DNS or external connection is made here.
         TORController *controller = [[TORController alloc] initWithSocketHost:@"127.0.0.1" port:(in_port_t)port];
         NSError *error = nil;
         if (!controller.connected && ![controller connect:&error]) { self.authenticating = NO; return; }
         self.controller = controller;
+        NSUInteger generation = ++self.authenticationGeneration;
+        self.statusText = @"Authenticating Tor control";
+        [self publish];
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 10 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+            if (generation == self.authenticationGeneration && self.authenticating) [self statusUnavailable];
+        });
         [controller authenticateWithData:cookie completion:^(BOOL success, NSError *error) {
             dispatch_async(dispatch_get_main_queue(), ^{
-                self.authenticating = NO; self.authenticated = success;
-                if (!success) { [controller disconnect]; self.controller = nil; }
+                if (generation != self.authenticationGeneration || controller != self.controller) return;
+                self.authenticating = success; self.authenticated = NO;
+                if (!success) { [self statusUnavailable]; return; }
+                // Resume/reconnect can follow a pause whose control command
+                // succeeded just before the control connection was lost.
+                if (success) [controller setConfForKey:@"DisableNetwork" withValue:(self.paused ? @"1" : @"0") completion:^(BOOL applied, NSError *error) {
+                    dispatch_async(dispatch_get_main_queue(), ^{
+                        if (generation != self.authenticationGeneration || controller != self.controller) return;
+                        self.authenticating = NO;
+                        self.authenticated = applied;
+                        if (!applied) [self statusUnavailable];
+                        else {
+                            self.connectionStage = self.paused ? @"paused" : @"connecting";
+                            self.statusText = self.paused ? @"Paused" : @"Connecting";
+                            [self publish];
+                        }
+                    });
+                }];
             });
         }];
         return;
     }
-    [self.controller getInfoForKeys:@[@"status/bootstrap-phase", @"status/circuit-established"] completion:^(NSArray<NSString *> *values) {
+    TBIOStatusPoll state = self.statusPoll;
+    uint64_t generation = TBIOPollBegin(&state, NSProcessInfo.processInfo.systemUptime);
+    if (!generation) return; // Never queue overlapping GETINFO queries.
+    self.statusPoll = state;
+    TORController *controller = self.controller;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 10 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+        TBIOStatusPoll state = self.statusPoll;
+        if (TBIOPollExpire(&state, generation, NSProcessInfo.processInfo.systemUptime)) {
+            self.statusPoll = state;
+            [self statusUnavailable];
+        }
+    });
+    [controller getInfoForKeys:@[@"status/bootstrap-phase", @"status/circuit-established"] completion:^(NSArray<NSString *> *values) {
         dispatch_async(dispatch_get_main_queue(), ^{
-            if (self.paused) return;
+            TBIOStatusPoll state = self.statusPoll;
+            if (self.paused || controller != self.controller) return;
+            if (!TBIOPollAccept(&state, generation, NSProcessInfo.processInfo.systemUptime)) {
+                if (TBIOPollExpire(&state, generation, NSProcessInfo.processInfo.systemUptime)) {
+                    self.statusPoll = state;
+                    [self statusUnavailable];
+                }
+                return;
+            }
+            self.statusPoll = state;
             NSString *phase = [values.firstObject isKindOfClass:NSString.class] ? values.firstObject : @"";
             NSRegularExpression *regex = [NSRegularExpression regularExpressionWithPattern:@"PROGRESS=([0-9]+)" options:0 error:nil];
             NSTextCheckingResult *match = [regex firstMatchInString:phase options:0 range:NSMakeRange(0, phase.length)];
-            if (match) self.bootstrapProgress = [[phase substringWithRange:[match rangeAtIndex:1]] integerValue];
-            self.ready = self.bootstrapProgress == 100 && values.count > 1 && [values[1] isKindOfClass:NSString.class] && [values[1] isEqualToString:@"1"];
+            NSInteger progress = match ? [[phase substringWithRange:[match rangeAtIndex:1]] integerValue] : -1;
+            BOOL valid = values.count == 2 && progress >= 0 && progress <= 100 &&
+                [values[1] isKindOfClass:NSString.class] &&
+                ([values[1] isEqualToString:@"0"] || [values[1] isEqualToString:@"1"]);
+            if (!valid) { [self statusUnavailable]; return; }
+            self.bootstrapProgress = progress;
+            self.ready = TBIOConnectionReady(valid, (int)progress, [values[1] isEqualToString:@"1"]);
+            self.connectionStage = self.ready ? @"connected" : @"connecting";
             self.statusText = self.ready ? @"Connected" : [NSString stringWithFormat:@"Connecting %ld%%", (long)self.bootstrapProgress];
             [self publish];
         });
@@ -203,27 +320,37 @@
 }
 
 - (void)pause {
+    NSUInteger generation = ++self.networkCommandGeneration;
+    [self invalidateStatusPoll];
+    self.connectionStage = @"paused";
     self.paused = YES; self.ready = NO; self.statusText = @"Paused"; [self publish];
     [self.controller setConfForKey:@"DisableNetwork" withValue:@"1" completion:^(BOOL success, NSError *error) {
         if (!success) dispatch_async(dispatch_get_main_queue(), ^{
-            self.paused = NO; self.statusText = @"Pause failed"; [self publish];
+            if (generation != self.networkCommandGeneration || !self.paused) return;
+            // Keep the application request gate closed even if Tor rejects
+            // DisableNetwork. Existing Gecko streams require separate testing.
+            self.statusText = @"Pause command failed — new requests blocked"; [self publish];
         });
     }];
 }
 - (void)requestNewCircuit {
     if (!self.authenticated || self.paused) return;
+    TORController *controller = self.controller;
+    NSUInteger generation = self.networkCommandGeneration;
     self.relayGeneration++;
     self.relayQueryPending = NO;
     self.relayInfoText = @"Circuit change requested. Refresh relays for updated information.";
     [self publish];
     // NEWNYM does not clear cookies, tabs, caches, or in-flight streams. It is NOT "New Identity".
-    [self.controller resetConnection:^(BOOL success) {
+    [controller resetConnection:^(BOOL success) {
         dispatch_async(dispatch_get_main_queue(), ^{
+            if (self.paused || generation != self.networkCommandGeneration || controller != self.controller) return;
             self.statusText = success ? @"Circuit requested" : @"Request failed";
             [self publish];
         });
     }];
 }
 @end
+
 
 

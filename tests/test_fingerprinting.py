@@ -21,6 +21,7 @@ def replace(path, before, after):
 def engine_fixture(engine):
     # Anchor fixtures are transformation tests, never runtime evidence.
     files = {
+        'toolkit/moz.configure': '"--enable-proxy-bypass-protection"\n"--disable-proxy-direct-failover"',
         'toolkit/components/resistfingerprinting/nsRFPService.h':
             '#elif defined(MOZ_WIDGET_ANDROID)\n#  define SPOOFED_UA_OS',
         'toolkit/components/resistfingerprinting/nsRFPService.cpp':

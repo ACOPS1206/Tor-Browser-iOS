@@ -6,7 +6,7 @@
   "network.proxy.socks_remote_dns": true,
   "network.proxy.no_proxies_on": "",
   "network.proxy.allow_hijacking_localhost": true,
-  "network.proxy.failover_direct": false,
+  "network.proxy.allow_bypass": false,
   "network.trr.mode": 5,
   "network.dns.disablePrefetch": true,
   "network.prefetch-next": false,

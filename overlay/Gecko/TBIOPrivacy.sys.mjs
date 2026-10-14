@@ -34,7 +34,7 @@ export function configureTorStartupPreferences(services) {
   }
 }
 
-export function createTorChannelFilter(proxyService, newToken, proxyFlags, mode = "always") {
+export function createTorChannelFilter(proxyService, newToken, proxyFlags, mode = "always", torPermitted = () => true) {
   if (!["always", "privateOnly", "never"].includes(mode)) mode = "always";
   const credentials = new Map();
   return {
@@ -58,6 +58,12 @@ export function createTorChannelFilter(proxyService, newToken, proxyFlags, mode 
           throw error;
         }
         return;
+      }
+      // The parent-process gate only applies to Tor-targeted new channels.
+      // Explicit Direct tabs remain usable while Tor is unavailable/paused.
+      if (!torPermitted()) {
+        channel.cancel(Cr.NS_ERROR_OFFLINE);
+        throw new Error("Tor unavailable: request blocked");
       }
       let key;
       try {
@@ -94,15 +100,20 @@ export function createTorChannelFilter(proxyService, newToken, proxyFlags, mode 
 }
 
 let installedFilter;
+let torPermitted = false;
+let stateListener;
 export function installTorChannelIsolation() {
   if (Services.appinfo.processType !== Services.appinfo.PROCESS_TYPE_DEFAULT) return;
   if (installedFilter) return;
   const proxyService = Cc["@mozilla.org/network/protocol-proxy-service;1"]
     .getService(Ci.nsIProtocolProxyService);
   const newToken = () => Services.uuid.generateUUID().toString().slice(1, -1);
+  stateListener = { onEvent(_event, data) { torPermitted = data?.permitted === true; } };
+  ChromeUtils.importESModule("resource://gre/modules/Messaging.sys.mjs")
+    .EventDispatcher.instance.registerListener(stateListener, ["TBIO:TorState"]);
   installedFilter = createTorChannelFilter(proxyService, newToken,
     Ci.nsIProxyInfo.TRANSPARENT_PROXY_RESOLVES_HOST,
-    Services.env.get("TBIO_ROUTING_MODE"));
+    Services.env.get("TBIO_ROUTING_MODE"), () => torPermitted);
   installedFilter.QueryInterface = ChromeUtils.generateQI(["nsIProtocolProxyChannelFilter"]);
   proxyService.registerChannelFilter(installedFilter, 0xffffffff);
 }

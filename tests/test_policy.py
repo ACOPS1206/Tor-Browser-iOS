@@ -15,7 +15,9 @@ class PolicyTests(unittest.TestCase):
         self.assertTrue(self.prefs['network.proxy.socks_remote_dns'])
         self.assertEqual(self.prefs['network.proxy.no_proxies_on'], '')
         self.assertTrue(self.prefs['network.proxy.allow_hijacking_localhost'])
-        self.assertFalse(self.prefs['network.proxy.failover_direct'])
+        self.assertFalse(self.prefs['network.proxy.allow_bypass'])
+        self.assertNotIn('network.proxy.failover_direct', self.prefs)
+        self.assertIn('--disable-proxy-direct-failover', (ROOT / 'scripts/apply-overlay.py').read_text())
         self.assertEqual(self.prefs['network.trr.mode'], 5)
 
     def test_non_tor_udp_transports_are_disabled(self):
@@ -32,7 +34,7 @@ class PolicyTests(unittest.TestCase):
 
     def test_bootstrap_needs_circuit_not_just_open_port(self):
         text = (ROOT / 'overlay/Reynard/Tor/TorService.m').read_text()
-        self.assertIn('self.bootstrapProgress == 100 && values.count > 1', text)
+        self.assertIn('TBIOConnectionReady(valid, (int)progress', text)
         self.assertIn('status/circuit-established', text)
         self.assertIn('CookieAuthentication', (ROOT / 'README.md').read_text())
         self.assertNotIn('New Identity";', text)
@@ -63,3 +65,4 @@ class PolicyTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
