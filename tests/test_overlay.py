@@ -65,7 +65,7 @@ class OverlayIntegrationTests(unittest.TestCase):
                 self.assertNotIn('.write(to:', text)
                 self.assertNotIn('Data(contentsOf:', text)
             self.assertIn('installTorChannelIsolation()', startup.read_text())
-            self.assertIn('TBIO_DISABLE_JAVASCRIPT', startup.read_text())
+            self.assertIn('configureTorStartupPreferences(Services)', startup.read_text())
             self.assertTrue((modules / 'TBIOPrivacy.sys.mjs').exists())
             # Python syntax alone accepts unsorted lists, but mozbuild rejects them.
             manifest = ast.parse((modules / 'moz.build').read_text())

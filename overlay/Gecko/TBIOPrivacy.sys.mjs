@@ -1,6 +1,31 @@
 /* SPDX-License-Identifier: MPL-2.0 */
 // Parent-process channel policy. Credentials are random, never domain names,
 // and never persisted. FPI supplies the top-level firstPartyDomain for frames.
+export function configureTorStartupPreferences(services) {
+  const mode = services.env.get("TBIO_ROUTING_MODE");
+  const selective = ["privateOnly", "never"].includes(mode);
+  const values = {
+    "browser.privatebrowsing.autostart": !selective,
+    "network.dns.disabled": !selective,
+    "javascript.enabled": services.env.get("TBIO_DISABLE_JAVASCRIPT") !== "1",
+  };
+  const defaults = services.prefs.getDefaultBranch("");
+  for (const [name, value] of Object.entries(values)) {
+    // mobile.js has already locked these defaults. Gecko silently ignores
+    // writes to a locked default branch, even from startup chrome code.
+    services.prefs.unlockPref(name);
+    try {
+      services.prefs.clearUserPref(name);
+      defaults.setBoolPref(name, value);
+    } finally {
+      services.prefs.lockPref(name);
+    }
+    if (services.prefs.getBoolPref(name) !== value) {
+      throw new Error(`Tor startup preference was not applied: ${name}`);
+    }
+  }
+}
+
 export function createTorChannelFilter(proxyService, newToken, proxyFlags, mode = "always") {
   if (!["always", "privateOnly", "never"].includes(mode)) mode = "always";
   const credentials = new Map();

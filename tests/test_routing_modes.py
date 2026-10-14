@@ -26,5 +26,5 @@ class RoutingModeTests(unittest.TestCase):
         self.assertIn('strcmp(mode, "never") == 0', source)
         source = (ROOT / 'scripts/apply-overlay.py').read_text()
         self.assertIn('TorNetwork.session(isPrivate: session.isPrivateMode)', source)
-        self.assertIn('defaults.setBoolPref("network.dns.disabled"', source)
+        self.assertIn('configureTorStartupPreferences(Services)', source)
 

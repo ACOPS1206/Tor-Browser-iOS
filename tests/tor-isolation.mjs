@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { createTorChannelFilter } from "../overlay/Gecko/TBIOPrivacy.sys.mjs";
+import { createTorChannelFilter, configureTorStartupPreferences } from "../overlay/Gecko/TBIOPrivacy.sys.mjs";
 let counter = 0;
 const service = { newProxyInfoWithAuth(...args) { assert.equal(args.length, 10); return args; } };
 const filter = createTorChannelFilter(service, () => `token-${++counter}`, 1);
@@ -96,3 +96,52 @@ createTorChannelFilter(routingService, () => "token", 1, "privateOnly").applyFil
   { onProxyFilterResult(proxy) { privateChromeProxy = proxy; } });
 assert.equal(privateChromeProxy[0], "socks");
 console.log("Forced-private chrome request remains on Tor: passed");
+
+// Model Gecko Preferences::SetDefault: locked defaults ignore writes silently.
+// Include user values left by an earlier launch, not just a clean profile.
+function startupServices(mode, blockJS = "0") {
+  const defaults = new Map([
+    ["browser.privatebrowsing.autostart", true],
+    ["network.dns.disabled", true], ["javascript.enabled", true],
+  ]);
+  const users = new Map(defaults);
+  const locked = new Set(defaults.keys());
+  const prefs = {
+    getDefaultBranch() { return { setBoolPref(name, value) {
+      if (!locked.has(name)) defaults.set(name, value);
+    } }; },
+    unlockPref(name) { locked.delete(name); },
+    clearUserPref(name) { users.delete(name); },
+    lockPref(name) { locked.add(name); },
+    getBoolPref(name) { return !locked.has(name) && users.has(name)
+      ? users.get(name) : defaults.get(name); },
+  };
+  return { prefs, locked, users, env: { get(name) {
+    return name === "TBIO_ROUTING_MODE" ? mode : blockJS;
+  } } };
+}
+const legacy = startupServices("privateOnly");
+legacy.prefs.getDefaultBranch("").setBoolPref("browser.privatebrowsing.autostart", false);
+assert.equal(legacy.prefs.getBoolPref("browser.privatebrowsing.autostart"), true);
+assert.equal(policy("privateOnly", 1), "socks"); // Ordinary window forced private by old default.
+let startupCases = 0;
+for (const mode of ["always", "privateOnly", "never", "invalid", ""]) {
+  for (const blockJS of ["0", "1"]) {
+    const services = startupServices(mode, blockJS);
+    configureTorStartupPreferences(services);
+    const selective = ["privateOnly", "never"].includes(mode);
+    assert.equal(services.prefs.getBoolPref("browser.privatebrowsing.autostart"), !selective);
+    assert.equal(services.prefs.getBoolPref("network.dns.disabled"), !selective);
+    assert.equal(services.prefs.getBoolPref("javascript.enabled"), blockJS !== "1");
+    assert.equal(services.users.size, 0);
+    assert.equal(services.locked.size, 3);
+    // WindowWatcher applies the global autostart pref OR the session's private flag.
+    for (const privateTab of [false, true]) {
+      const enginePrivate = services.prefs.getBoolPref("browser.privatebrowsing.autostart") || privateTab;
+      assert.equal(policy(mode, enginePrivate ? 1 : 0),
+        mode === "never" || (mode === "privateOnly" && !privateTab) ? "direct" : "socks");
+    }
+    startupCases++;
+  }
+}
+console.log(`Locked startup preferences and resulting tab routing: ${startupCases} cases passed`);

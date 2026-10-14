@@ -174,14 +174,7 @@ def apply_engine(target):
         startup = engine / 'mobile/shared/components/geckoview/GeckoViewStartup.sys.mjs'
         locks = '\n'.join('        Services.prefs.lockPref(' + json.dumps(key) + ');' for key in prefs)
         policy = '''
-        const routingMode = Services.env.get("TBIO_ROUTING_MODE");
-        const defaults = Services.prefs.getDefaultBranch("");
-        // Keep ordinary tabs available for selective/no-Tor routing.
-        defaults.setBoolPref("browser.privatebrowsing.autostart", !["privateOnly", "never"].includes(routingMode));
-        // Selected Tor channels still use SOCKS hostname resolution.
-        defaults.setBoolPref("network.dns.disabled", !["privateOnly", "never"].includes(routingMode));
-        defaults.setBoolPref("javascript.enabled", Services.env.get("TBIO_DISABLE_JAVASCRIPT") !== "1");
-        Services.prefs.lockPref("javascript.enabled");
+        ChromeUtils.importESModule("resource://gre/modules/TBIOPrivacy.sys.mjs").configureTorStartupPreferences(Services);
         ChromeUtils.importESModule("resource://gre/modules/TBIOPrivacy.sys.mjs").installTorChannelIsolation();'''
         replace(startup, '      case "profile-after-change": {', '      case "profile-after-change": {\n' + locks + policy)
     else:
@@ -197,4 +190,5 @@ if __name__ == '__main__':
         apply(target, browser_only=phase == 'browser')
     else:
         raise SystemExit('Phase must be all, browser, or engine')
+
 
