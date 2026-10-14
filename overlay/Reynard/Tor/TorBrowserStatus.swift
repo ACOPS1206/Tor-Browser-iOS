@@ -1,4 +1,7 @@
 import UIKit
+#if canImport(GeckoView)
+import GeckoView
+#endif
 
 extension BrowserViewController {
     func installTorStatusButton() {
