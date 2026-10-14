@@ -17,6 +17,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
       - uses: actions/checkout@v4
         with:
           repository: minh-ton/reynard-browser
@@ -25,10 +28,9 @@ jobs:
       - run: python3 -m unittest discover -s tests -v
         env:
           UPSTREAM_SOURCE: upstream
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
       - run: node tests/tor-isolation.mjs
+      - run: node tests/fingerprinting-settings.mjs
+      - run: node tests/tor-gate.mjs
   build:
     needs: validate
     runs-on: macos-26
@@ -127,7 +129,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: native-assets.tar
-          key: tor-ios-native-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.toolchain.outputs.digest }}-${{ hashFiles('upstream.lock.json', 'privacy-prefs.json', 'overlay/Gecko/**', 'scripts/apply-overlay.py') }}
+          key: tor-ios-native-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.toolchain.outputs.digest }}-${{ hashFiles('upstream.lock.json', 'privacy-prefs.json', 'overlay/Gecko/**', 'scripts/apply-overlay.py', 'scripts/fingerprinting-policy.py') }}
       - name: Unpack compiled native assets
         if: steps.native-assets.outputs.cache-hit == 'true'
         run: tar -xf native-assets.tar -C upstream
@@ -197,4 +199,5 @@ jobs:
             Podfile.resolved.lock
           if-no-files-found: ignore
           retention-days: 7
+
 
