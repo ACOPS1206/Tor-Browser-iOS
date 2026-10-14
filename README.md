@@ -96,3 +96,13 @@ Open **Settings → Privacy → Tor Connection & Relays**, or tap the browser st
 The relay view shows built general-purpose circuits, with each relay's role (Guard / Middle / Exit), nickname, IP address and fingerprint. Circuits may be unused or belong to different sites; they are not attributed to the current tab. Onion-service and internal directory circuits are excluded rather than mislabeled as exit circuits. Missing IP metadata is shown as unavailable. Information is read through the authenticated local Tor controller only, is not persisted, refreshes every 10 seconds while the page is visible, and is cleared on pause or loss of Tor readiness. A 10-second timeout rejects late responses.
 
 The direct-routing implementation uses the pinned Gecko 157 proxy API with all eight `newProxyInfo` arguments. Older builds used a six-argument call that Gecko skipped, leaving SOCKS enabled for ordinary tabs and causing proxy-refused errors when Tor was off. Regression tests now enforce the real API signature and replacement of an existing SOCKS proxy. Changes still apply only after a full app restart.
+
+# Fingerprinting review and local diagnostics
+
+See [the privacy review](docs/FINGERPRINTING_REVIEW.md) for source evidence,
+changes, compatibility risks, and strictly separated mock/runtime/device results.
+Run the local regressions with `python -m unittest discover -s tests -v`,
+`node tests/tor-isolation.mjs`, and `node tests/fingerprinting-settings.mjs`.
+`tests/runtime/` contains opt-in, non-persisting browser probes; their availability
+does not mean they have passed in Gecko or on iPhone. No workflow change is needed.
+

@@ -19,11 +19,21 @@ extension BrowserViewController {
         NotificationCenter.default.addObserver(self, selector: #selector(updateTorStatusButton), name: Notification.Name("TBIO.TorStatus"), object: nil)
         updateTorStatusButton()
     }
-    @objc private func updateTorStatusButton() {
+    @objc func updateTorStatusButton() {
         guard let button = view.viewWithTag(19050) as? UIButton else { return }
-        let prefix = TorPrivacy.activeRoutingMode == .privateOnly ? "Private tabs only · " : ""
-        button.setTitle(prefix + TBIOTorService.shared.statusText, for: .normal)
-        button.setTitleColor(TBIOTorService.shared.ready && TorPrivacy.activeRoutingMode == .always ? .systemGreen : .systemOrange, for: .normal)
+        guard let session = tabManager.selectedTab?.session else {
+            button.setTitle("No Tab · Tor Client: " + TBIOTorService.shared.statusText, for: .normal)
+            button.setTitleColor(.secondaryLabel, for: .normal)
+            return
+        }
+        let tab = tabManager.selectedTabMode == .private ? "Private Tab" : "Normal Tab"
+        let usesTor = TorPrivacy.activeRoutingMode.usesTor(isPrivate: session.isPrivateMode)
+        // This is the selected session policy plus client state, not a
+        // measurement of the site's IP or a per-channel route assertion.
+        let state = usesTor ? "Tor Policy · Client: " + TBIOTorService.shared.statusText : "Direct Connection Policy"
+        button.setTitle(tab + " · " + state, for: .normal)
+        button.accessibilityHint = "Routing policy and Tor client state. This does not verify the route of a request."
+        button.setTitleColor(usesTor ? .systemOrange : .secondaryLabel, for: .normal)
         view.bringSubviewToFront(button)
     }
     @objc private func openTorStatus() {
@@ -33,5 +43,6 @@ extension BrowserViewController {
     }
     @objc private func closeTorStatus() { dismiss(animated: true) }
 }
+
 
 

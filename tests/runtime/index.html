@@ -1,0 +1,44 @@
+<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tor-iOS runtime diagnostics</title>
+<h1>Tor-iOS runtime diagnostics</h1>
+<p>Results remain in memory. No third-party requests or storage. Hash changes alone do not prove privacy.</p>
+<button id="run">Run fingerprint probes</button>
+<button id="echo">Check this server's received headers and peer IP</button>
+<pre id="out"></pre>
+<script type="module">
+import {probe} from './probe.mjs';
+const out = document.querySelector('#out');
+document.querySelector('#run').onclick = async () => {
+  out.textContent = 'Running…';
+  const result = await probe();
+  const worker = new Worker('./worker.mjs', {type:'module'});
+  result.worker = await new Promise(resolve => {
+    const timeout = setTimeout(() => { worker.terminate(); resolve({unavailable:'timeout'}); }, 10000);
+    worker.onmessage = e => { clearTimeout(timeout); worker.terminate(); resolve(e.data); };
+    worker.onerror = () => { clearTimeout(timeout); worker.terminate(); resolve({unavailable:'worker error'}); };
+  });
+  const n = result.identity;
+  result.checks = {
+    mobileIdentity: /Android 10; Mobile/.test(n.userAgent) &&
+      n.platform === 'Linux armv81' && n.oscpu === 'Linux armv81' &&
+      n.appVersion === '5.0 (Android 10)' && n.maxTouchPoints === 5,
+    windowWorkerIdentity: result.worker.identity ? ['userAgent','platform','appVersion',
+      'hardwareConcurrency','language'].every(k =>
+        JSON.stringify(n[k]) === JSON.stringify(result.worker.identity[k])) : 'unavailable',
+    englishLocale: result.timezone.locale.startsWith('en'),
+    utcOffset: result.offsetMinutes === 0,
+    webRTCUnavailable: !result.api.webRTC,
+    webGPUUnavailable: !result.api.webgpu,
+    note: 'These assertions check limited invariants. They do not prove anonymity, routing, or full API coverage.',
+  };
+  out.textContent = JSON.stringify(result, null, 2);
+};
+document.querySelector('#echo').onclick = async () => {
+  try { const r = await fetch('/echo?nonce=' + crypto.randomUUID(), {cache:'no-store',credentials:'omit'});
+    if (!r.ok) throw Error('HTTP '+r.status);
+    const received = await r.json();
+    received.httpJsUserAgentMatch = received.userAgent === navigator.userAgent;
+    out.textContent = JSON.stringify(received,null,2);
+  } catch(e) { out.textContent = 'Request failed: '+e.message; }
+};
+</script>

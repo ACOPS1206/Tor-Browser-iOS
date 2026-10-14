@@ -20,6 +20,8 @@ class OverlayIntegrationTests(unittest.TestCase):
             shutil.copytree(os.environ['UPSTREAM_SOURCE'], target, ignore=shutil.ignore_patterns('.git'))
             # Engine fixture tests insertion and locking; actual Gecko compilation is a separate CI job.
             engine = target / 'engine/firefox'
+            from test_fingerprinting import engine_fixture
+            engine_fixture(engine)
             defaults = engine / 'mobile/ios/app/mobile.js'
             defaults.parent.mkdir(parents=True, exist_ok=True)
             defaults.write_text('pref("test.fixture", true);\n')
@@ -77,5 +79,6 @@ class OverlayIntegrationTests(unittest.TestCase):
             # Applying twice must reject changed anchors, not silently produce a broken build.
             with self.assertRaises(RuntimeError):
                 module.apply(target)
+
 
 

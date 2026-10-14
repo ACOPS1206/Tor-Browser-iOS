@@ -1,4 +1,12 @@
 /* SPDX-License-Identifier: MPL-2.0 */
+// Every GeckoView session, including extension popups, uses the engine RFP
+// identity. Mobile viewport and real touch input remain available.
+export function fingerprintingSessionSettings(settings) {
+  return { ...settings, userAgentMode: 0, userAgentOverride: null,
+    platformOverride: null, appVersionOverride: null, oscpuOverride: null,
+    buildIDOverride: null };
+}
+
 // Parent-process channel policy. Credentials are random, never domain names,
 // and never persisted. FPI supplies the top-level firstPartyDomain for frames.
 export function configureTorStartupPreferences(services) {
@@ -98,5 +106,6 @@ export function installTorChannelIsolation() {
   installedFilter.QueryInterface = ChromeUtils.generateQI(["nsIProtocolProxyChannelFilter"]);
   proxyService.registerChannelFilter(installedFilter, 0xffffffff);
 }
+
 
 

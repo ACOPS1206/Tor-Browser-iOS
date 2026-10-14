@@ -3,6 +3,7 @@
 import json
 import shutil
 import sys
+import importlib.util
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -117,6 +118,13 @@ def apply(target, browser_only=False):
     # A permanent visible status button, including while connecting or paused.
     vc = app / 'Client/Interface/BrowserViewController.swift'
     replace(vc, '        configureBrowserInterface()', '        configureBrowserInterface()\n        installTorStatusButton()')
+    delegate = app / 'Client/Interface/BrowserViewController+TabManager.swift'
+    for signature in [
+        'func tabManagerDidChangeTabs(_ tabManager: TabManager)',
+        'func tabManager(_ tabManager: TabManager, didSelectTabAt index: Int, previousIndex: Int?)',
+        'func tabManager(_ tabManager: TabManager, didReplaceSelectedSession previousSession: GeckoSession, with replacementSession: GeckoSession)',
+    ]:
+        replace(delegate, signature + ' {', signature + ' {\n        defer { updateTorStatusButton() }')
     # Route native downloads, icons and previews through SOCKS. JIT's local developer
     # connection and its explicitly invoked DDI setup remain outside browser traffic.
     for relative in ['Client/Stores/FaviconStore.swift', 'Client/Stores/SiteMetadataStore.swift', 'Client/Stores/DownloadStore.swift']:
@@ -160,6 +168,10 @@ def apply_engine(target):
     prefs = json.loads((ROOT / 'privacy-prefs.json').read_text())
     # Bake proxy prefs into Gecko before startup networking, not after first tab creation.
     engine = target / 'engine/firefox'
+    spec = importlib.util.spec_from_file_location('fingerprinting_policy', ROOT / 'scripts/fingerprinting-policy.py')
+    fingerprinting = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(fingerprinting)
+    fingerprinting.apply(engine, replace)
     if (engine / 'mobile/ios/app/mobile.js').exists():
         defaults = engine / 'mobile/ios/app/mobile.js'
         with defaults.open('a') as stream:
@@ -190,5 +202,6 @@ if __name__ == '__main__':
         apply(target, browser_only=phase == 'browser')
     else:
         raise SystemExit('Phase must be all, browser, or engine')
+
 
 

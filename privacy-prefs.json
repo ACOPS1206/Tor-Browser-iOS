@@ -19,6 +19,7 @@
   "dom.push.enabled": false,
   "dom.webnotifications.enabled": false,
   "privacy.resistFingerprinting": true,
+  "privacy.spoof_english": 2,
   "privacy.firstparty.isolate": true,
   "privacy.trackingprotection.enabled": true,
   "privacy.trackingprotection.pbmode.enabled": true,
@@ -71,3 +72,4 @@
   "network.protocol-handler.external-default": false,
   "network.protocol-handler.warn-external-default": true
 }
+
