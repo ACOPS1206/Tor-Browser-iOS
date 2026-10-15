@@ -25,8 +25,11 @@ def apply(engine: Path, replace):
             precisionType == LOCAL_GL_MEDIUM_FLOAT ? 10 : 23;
         const uint8_t exponent = precisionType == LOCAL_GL_LOW_FLOAT ? 8 :
             precisionType == LOCAL_GL_MEDIUM_FLOAT ? 14 : 127;
-        spf.rangeMin = std::min(spf.rangeMin, uint8_t(isFloat ? exponent : 8));
-        spf.rangeMax = std::min(spf.rangeMax, uint8_t(isFloat ? exponent : 7));
+        const uint8_t integerBits = precisionType == LOCAL_GL_LOW_INT ? 8 :
+            precisionType == LOCAL_GL_MEDIUM_INT ? 10 :
+            webgl->IsWebGL2() ? 31 : 16;
+        spf.rangeMin = std::min(spf.rangeMin, uint8_t(isFloat ? exponent : integerBits));
+        spf.rangeMax = std::min(spf.rangeMax, uint8_t(isFloat ? exponent : integerBits - 1));
         spf.precision = std::min(spf.precision, uint8_t(isFloat ? bits : 0));
       }
       out->shaderPrecisions->insert({{shaderType, precisionType}, spf});''')

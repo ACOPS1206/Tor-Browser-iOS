@@ -46,7 +46,7 @@ class SecurityLevelTests(unittest.TestCase):
             defines='\n'.join(f'constexpr int LOCAL_GL_{name} = {i};' for i,name in enumerate(names))
             (p/'test.cpp').write_text('#include <algorithm>\n#include <cstdint>\n#include <cassert>\n'+defines+'''
 struct Format { uint8_t rangeMin, rangeMax, precision; };
-struct WebGL { bool mResistFingerprinting; };
+struct WebGL { bool mResistFingerprinting; bool IsWebGL2() const { return true; } };
 Format normalize(Format spf, int precisionType, WebGL* webgl) {
 '''+block+'''return spf; }
 int main() { WebGL yes{true}, no{false};
