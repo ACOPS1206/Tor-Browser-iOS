@@ -20,6 +20,11 @@ additional = [engine / 'browser/app/profile/firefox.js',
               engine / 'toolkit/components/extensions/AddonManager.sys.mjs']
 sources = '\n'.join(p.read_text() for p in additional if p.exists())
 prefs = json.loads((root / 'privacy-prefs.json').read_text())
+# Security-level preferences are also verified against this exact Gecko build.
+level_source = (root / 'overlay/Gecko/TBIOSecurityPolicy.sys.mjs').read_text()
+for key in re.findall(r'"((?:mathml|svg)\.[^"]+)"\s*:', level_source):
+    prefs[key] = None
+prefs['javascript.enabled'] = None
 missing = [key for key in prefs if key not in names and f'"{key}"' not in sources]
 if missing:
     raise SystemExit('Unverified Gecko policy prefs: ' + ', '.join(missing))

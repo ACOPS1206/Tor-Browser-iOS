@@ -31,6 +31,7 @@ globalThis.Services = {appinfo:{processType:0,PROCESS_TYPE_DEFAULT:0},
 globalThis.Cc = {'@mozilla.org/network/protocol-proxy-service;1':{getService(){return service;}}};
 globalThis.Ci = {nsIProtocolProxyService:{},nsIProxyInfo:{TRANSPARENT_PROXY_RESOLVES_HOST:1}};
 globalThis.ChromeUtils = {generateQI(){return ()=>{};},importESModule(){return {
+  noScriptReady: () => true,
   EventDispatcher:{instance:{registerListener(l,events){assert.deepEqual(events,['TBIO:TorState']);listener=l;}}}};}};
 installTorChannelIsolation();
 assert.equal(request(registeredFilter,1).cancelled,43); // cold start fails closed

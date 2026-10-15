@@ -1,0 +1,14 @@
+<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Security level runtime check</title>
+<h1>Security level runtime check</h1>
+<p>This page works with JavaScript blocked. Serve the same files on your own HTTP and HTTPS origins. No results are sent or stored.</p>
+<ul>
+<li id="inline">Inline script: NOT EXECUTED</li>
+<li id="external">External script: NOT EXECUTED</li>
+<li>MathML: the fraction below should render as a fraction only in Standard: <math><mfrac><mn>1</mn><mn>2</mn></mfrac></math></li>
+<li>Inline SVG: a square should appear in Standard/Safer, be absent in Safest: <svg width="20" height="20"><rect width="20" height="20" fill="black"/></svg></li>
+</ul>
+<p>Expected default scripts: Standard HTTP/HTTPS enabled; Safer HTTPS enabled and HTTP blocked; Safest both blocked. A .onion address is treated as secure by NoScript. Explicit site permissions can override these defaults. Block JavaScript must override every site exception.</p>
+<p>In the browser's extensions menu, open NoScript. Verify popup site permissions and allow/revoke this origin. Repeat in normal/private tabs, after a clean launch with no Internet, after restart, and after changing level. The diagnostic page itself cannot attest that NoScript is installed.</p>
+<script>document.querySelector('#inline').textContent='Inline script: EXECUTED';</script>
+<script src="security-level-probe.js"></script>

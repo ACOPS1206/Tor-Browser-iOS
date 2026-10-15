@@ -1,4 +1,5 @@
 /* SPDX-License-Identifier: MPL-2.0 */
+import { securityPreferences } from "./TBIOSecurityPolicy.sys.mjs";
 // Every GeckoView session, including extension popups, uses the engine RFP
 // identity. Mobile viewport and real touch input remain available.
 export function fingerprintingSessionSettings(settings) {
@@ -13,6 +14,7 @@ export function configureTorStartupPreferences(services) {
   const mode = services.env.get("TBIO_ROUTING_MODE");
   const selective = ["privateOnly", "never"].includes(mode);
   const values = {
+    ...securityPreferences(services.env.get("TBIO_SECURITY_LEVEL") || "standard"),
     "browser.privatebrowsing.autostart": !selective,
     "network.dns.disabled": !selective,
     "javascript.enabled": services.env.get("TBIO_DISABLE_JAVASCRIPT") !== "1",
@@ -34,11 +36,17 @@ export function configureTorStartupPreferences(services) {
   }
 }
 
-export function createTorChannelFilter(proxyService, newToken, proxyFlags, mode = "always", torPermitted = () => true) {
+export function createTorChannelFilter(proxyService, newToken, proxyFlags, mode = "always", torPermitted = () => true, securityReady = () => true) {
   if (!["always", "privateOnly", "never"].includes(mode)) mode = "always";
   const credentials = new Map();
   return {
     applyFilter(channel, _previousProxy, callback) {
+      // No page network traffic before the required extension has confirmed
+      // enforcement. This gate also covers explicit Direct tabs.
+      if (!securityReady()) {
+        channel.cancel(Cr.NS_ERROR_NOT_AVAILABLE);
+        throw new Error("NoScript protection is not ready");
+      }
       // Direct routing is an explicit user policy, NEVER a Tor error fallback.
       // Unknown context stays on Tor in private-only mode.
       let privateId, forcedPrivate;
@@ -113,7 +121,8 @@ export function installTorChannelIsolation() {
     .EventDispatcher.instance.registerListener(stateListener, ["TBIO:TorState"]);
   installedFilter = createTorChannelFilter(proxyService, newToken,
     Ci.nsIProxyInfo.TRANSPARENT_PROXY_RESOLVES_HOST,
-    Services.env.get("TBIO_ROUTING_MODE"), () => torPermitted);
+    Services.env.get("TBIO_ROUTING_MODE"), () => torPermitted,
+    () => ChromeUtils.importESModule("resource://gre/modules/TBIONoScript.sys.mjs").noScriptReady());
   installedFilter.QueryInterface = ChromeUtils.generateQI(["nsIProtocolProxyChannelFilter"]);
   proxyService.registerChannelFilter(installedFilter, 0xffffffff);
 }

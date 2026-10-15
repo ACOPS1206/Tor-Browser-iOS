@@ -2,7 +2,7 @@ import UIKit
 
 /// Shared rows used directly in Settings' Privacy section and on the status page.
 final class TorPrivacySettingsSection {
-    let rowCount = 4
+    let rowCount = 5
     var didChange: (() -> Void)?
 
     func cell(at row: Int, from controller: UIViewController) -> UITableViewCell {
@@ -21,6 +21,9 @@ final class TorPrivacySettingsSection {
             toggle.addTarget(self, action: #selector(changed(_:)), for: .valueChanged)
             cell.accessoryView = toggle
             cell.selectionStyle = .none
+        case 3:
+            cell.textLabel?.text = "Security Level: \(TorPrivacy.securityLevel.title)"
+            cell.accessoryType = .disclosureIndicator
         default:
             cell.textLabel?.text = "Tor Connection & Relays"
             cell.accessoryType = .disclosureIndicator
@@ -33,7 +36,20 @@ final class TorPrivacySettingsSection {
     private weak var presentingController: UIViewController?
 
     func selectRow(at row: Int, from controller: UIViewController) {
-        guard row == 3 else { return }
+        if row == 3 {
+            let alert = UIAlertController(title: "Security Level",
+                message: "Standard: compatible defaults. Safer: HTTPS-only scripts; media and WebGL need permission. Safest: scripts blocked by default; fonts, MathML and SVG restricted. Block JavaScript overrides all site exceptions. Changes reset NoScript exceptions and apply after fully closing and reopening the app.", preferredStyle: .alert)
+            for level in TorPrivacy.SecurityLevel.allCases {
+                alert.addAction(UIAlertAction(title: level.title, style: .default) { [weak self] _ in
+                    TorPrivacy.securityLevel = level
+                    self?.didChange?()
+                })
+            }
+            alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+            controller.present(alert, animated: true)
+            return
+        }
+        guard row == 4 else { return }
         controller.navigationController?.pushViewController(TorStatusViewController(), animated: true)
     }
 
@@ -68,7 +84,7 @@ final class TorPrivacySettingsSection {
         presentingController?.present(alert, animated: true)
     }
 
-    static let footer = "Use Tor for all tabs, or enable Private Tabs Only to use Tor only in private tabs. Turn Use Tor off for direct connections in all tabs. Routing and JavaScript changes require fully closing and reopening the app. In private-only mode, auxiliary requests with no reliable tab context are blocked."
+    static let footer = "Use Tor for all tabs, or enable Private Tabs Only to use Tor only in private tabs. Turn Use Tor off for direct connections in all tabs. Security level and JavaScript changes require fully closing and reopening the app. In private-only mode, auxiliary requests with no reliable tab context are blocked."
 }
 
 final class TorStatusViewController: UITableViewController {
@@ -102,7 +118,7 @@ final class TorStatusViewController: UITableViewController {
     @objc private func refresh() { tableView.reloadData() }
     override func numberOfSections(in tableView: UITableView) -> Int { 4 }
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        [3, 3, 2, 1][section]
+        [privacy.rowCount - 1, 3, 2, 1][section]
     }
     override func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
         ["Privacy", "Connection", "Built Circuits", "About"][section]

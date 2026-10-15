@@ -31,6 +31,8 @@ jobs:
       - run: node tests/tor-isolation.mjs
       - run: node tests/fingerprinting-settings.mjs
       - run: node tests/tor-gate.mjs
+      - run: node tests/security-level.mjs
+      - run: node tests/noscript-startup.mjs
   build:
     needs: validate
     runs-on: macos-26
@@ -119,6 +121,10 @@ jobs:
           python3 scripts/check-gecko-prefs.py upstream/engine/firefox
           node --check upstream/engine/firefox/mobile/shared/modules/geckoview/TBIOPrivacy.sys.mjs
           node --check upstream/engine/firefox/mobile/shared/components/geckoview/GeckoViewStartup.sys.mjs
+          node --check upstream/engine/firefox/mobile/shared/modules/geckoview/TBIONoScript.sys.mjs
+          node --check upstream/engine/firefox/mobile/shared/modules/geckoview/TBIOSecurityPolicy.sys.mjs
+          node --check upstream/engine/firefox/toolkit/components/extensions/ExtensionParent.sys.mjs
+          node --check upstream/engine/firefox/mobile/shared/modules/geckoview/GeckoViewWebExtension.sys.mjs
       - name: Fingerprint native build toolchain
         id: toolchain
         run: |
@@ -129,7 +135,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: native-assets.tar
-          key: tor-ios-native-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.toolchain.outputs.digest }}-${{ hashFiles('upstream.lock.json', 'privacy-prefs.json', 'overlay/Gecko/**', 'scripts/apply-overlay.py', 'scripts/fingerprinting-policy.py') }}
+          key: tor-ios-native-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.toolchain.outputs.digest }}-${{ hashFiles('upstream.lock.json', 'privacy-prefs.json', 'overlay/Gecko/**', 'scripts/apply-overlay.py', 'scripts/fingerprinting-policy.py', 'scripts/security-policy.py') }}
       - name: Unpack compiled native assets
         if: steps.native-assets.outputs.cache-hit == 'true'
         run: tar -xf native-assets.tar -C upstream

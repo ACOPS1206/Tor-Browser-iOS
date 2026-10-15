@@ -70,6 +70,11 @@
   "browser.send_pings": false,
   "network.auth.subresource-http-auth-allow": 1,
   "network.protocol-handler.external-default": false,
-  "network.protocol-handler.warn-external-default": true
+  "network.protocol-handler.warn-external-default": true,
+  "webgl.enable-debug-renderer-info": false,
+  "webgl.enable-renderer-query": false,
+  "webgl.enable-privileged-extensions": false,
+  "webgl.enable-draft-extensions": false,
+  "webgl.disable-fail-if-major-performance-caveat": true,
+  "extensions.webextensions.restrictedDomains": ""
 }
-

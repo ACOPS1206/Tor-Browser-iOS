@@ -21,6 +21,10 @@ def replace(path, before, after):
 def engine_fixture(engine):
     # Anchor fixtures are transformation tests, never runtime evidence.
     files = {
+        'dom/canvas/ClientWebGLContext.cpp': '  if (StaticPrefs::webgl_enable_privileged_extensions()) {\n    return false;\n  }',
+        'dom/canvas/WebGLContext.cpp': '      out->shaderPrecisions->insert({{shaderType, precisionType}, spf});',
+        'toolkit/components/extensions/ExtensionParent.sys.mjs': 'export var ExtensionParent = {',
+        'mobile/shared/modules/geckoview/GeckoViewWebExtension.sys.mjs': '  /* eslint-disable complexity */\n  async onEvent(aEvent, aData, aCallback) {\n    debug`onEvent ${aEvent} ${aData}`;\n\n    switch (aEvent) {',
         'toolkit/moz.configure': '"--enable-proxy-bypass-protection"\n"--disable-proxy-direct-failover"',
         'toolkit/components/resistfingerprinting/nsRFPService.h':
             '#elif defined(MOZ_WIDGET_ANDROID)\n#  define SPOOFED_UA_OS',

@@ -134,7 +134,7 @@ for (const mode of ["always", "privateOnly", "never", "invalid", ""]) {
     assert.equal(services.prefs.getBoolPref("network.dns.disabled"), !selective);
     assert.equal(services.prefs.getBoolPref("javascript.enabled"), blockJS !== "1");
     assert.equal(services.users.size, 0);
-    assert.equal(services.locked.size, 3);
+    assert.equal(services.locked.size, 5);
     // WindowWatcher applies the global autostart pref OR the session's private flag.
     for (const privateTab of [false, true]) {
       const enginePrivate = services.prefs.getBoolPref("browser.privatebrowsing.autostart") || privateTab;

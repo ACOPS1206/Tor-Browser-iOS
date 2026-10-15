@@ -77,8 +77,14 @@ def apply(target, browser_only=False):
     shutil.copytree(ROOT / 'overlay/Reynard/Tor', app / 'Tor', dirs_exist_ok=True)
     shutil.copy2(ROOT / 'Podfile', browser / 'Podfile')
     shutil.copy2(ROOT / 'scripts/compact-gecko-resources.py', browser / 'Scripts/CompactGeckoResources.py')
+    shutil.copy2(ROOT / 'scripts/bundle-noscript.py', browser / 'Scripts/BundleNoScript.py')
+    shutil.copy2(ROOT / 'vendor/noscript/noscript.xpi', browser / 'Scripts/NoScript.xpi')
     resources = browser / 'Scripts/AddGecko.sh'
-    replace(resources, '# default theme missing error fix', '''# Compact the copied resources, before signing; do not alter cached engine dist.
+    replace(resources, '# default theme missing error fix', '''# Install the verified offline extension before framework signing.
+python3 "${SRCROOT}/Scripts/BundleNoScript.py" "${SRCROOT}/Scripts/NoScript.xpi" "${GECKOVIEW_FW_FRAMEWORKS}/tbio-noscript"
+echo "resource tbio-noscript file:tbio-noscript/" >> "${GECKOVIEW_FW_FRAMEWORKS}/chrome.manifest"
+
+# Compact the copied resources, before signing; do not alter cached engine dist.
 if [ -f "${GECKOVIEW_FW_FRAMEWORKS}/omni.ja" ]; then
     python3 "${SRCROOT}/Scripts/CompactGeckoResources.py" "${GECKOVIEW_FW_FRAMEWORKS}/omni.ja"
 fi
@@ -159,7 +165,7 @@ fi
     replace(app / 'Client/Interface/Library/Settings/Sections/Updates/UpdatesSettingsSection.swift', 'URLSession(configuration: .default)', 'URLSession(configuration: TorNetwork.configuration())')
     # Persisted bridge/engine settings cannot change immutable Tor networking defaults.
     runtime = browser / 'GeckoView/Runtime/GeckoRuntime.swift'
-    keys = ',\n            '.join(json.dumps(key) for key in [*prefs, 'javascript.enabled'])
+    keys = ',\n            '.join(json.dumps(key) for key in [*prefs, 'javascript.enabled', 'mathml.disabled', 'svg.disabled'])
     replace(runtime, 'message: preferences', 'message: preferences.filter { !Set<String>([\n            ' + keys + '\n        ]).contains($0.key) }')
     # External applications can connect outside Tor. Apply to every delegate,
     # including addon popups, subframes and redirects, before dispatching to UI.
@@ -173,6 +179,9 @@ private func loadRequestTarget''')
     replace(nav, '            let target = loadRequestTarget(', '            guard torAllowsNavigation(uri) else { return false }\n            let target = loadRequestTarget(')
     replace(nav, '            let isTopLevel =', '            guard torAllowsNavigation(request.uri) else { return true }\n            let isTopLevel =')
     replace(nav, '            return await delegate?.onPreNavigation', '            guard torAllowsNavigation(request.uri) else { return true }\n            return await delegate?.onPreNavigation')
+    addons = app / 'Client/Interface/Addons/AddonCoordinator.swift'
+    replace(addons, 'installedAddons.filter { !$0.isBuiltIn }',
+        'installedAddons.filter { !$0.isBuiltIn || $0.id == "{73a6fe31-595d-460b-a920-fcc0f8843232}" }')
     if not browser_only:
         apply_engine(target)
     build = target / 'tools/release/build-app.sh'
@@ -197,6 +206,10 @@ def apply_engine(target):
     fingerprinting = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(fingerprinting)
     fingerprinting.apply(engine, replace)
+    spec = importlib.util.spec_from_file_location('security_policy', ROOT / 'scripts/security-policy.py')
+    security = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(security)
+    security.apply(engine, replace)
     if (engine / 'mobile/ios/app/mobile.js').exists():
         defaults = engine / 'mobile/ios/app/mobile.js'
         with defaults.open('a') as stream:
@@ -204,14 +217,16 @@ def apply_engine(target):
             for key, value in prefs.items():
                 stream.write(f'pref({json.dumps(key)}, {json.dumps(value)}, locked);\n')
         modules = engine / 'mobile/shared/modules/geckoview'
-        shutil.copy2(ROOT / 'overlay/Gecko/TBIOPrivacy.sys.mjs', modules / 'TBIOPrivacy.sys.mjs')
+        for name in ['TBIOPrivacy.sys.mjs', 'TBIONoScript.sys.mjs', 'TBIOSecurityPolicy.sys.mjs']:
+            shutil.copy2(ROOT / 'overlay/Gecko' / name, modules / name)
         # mozbuild enforces alphabetical ordering, not just Python syntax.
         replace(modules / 'moz.build', '    "Messaging.sys.mjs",',
-            '    "Messaging.sys.mjs",\n    "TBIOPrivacy.sys.mjs",')
+            '    "Messaging.sys.mjs",\n    "TBIONoScript.sys.mjs",\n    "TBIOPrivacy.sys.mjs",\n    "TBIOSecurityPolicy.sys.mjs",')
         startup = engine / 'mobile/shared/components/geckoview/GeckoViewStartup.sys.mjs'
         locks = '\n'.join('        Services.prefs.lockPref(' + json.dumps(key) + ');' for key in prefs)
         policy = '''
         ChromeUtils.importESModule("resource://gre/modules/TBIOPrivacy.sys.mjs").configureTorStartupPreferences(Services);
+        ChromeUtils.importESModule("resource://gre/modules/TBIONoScript.sys.mjs").initializeNoScript();
         ChromeUtils.importESModule("resource://gre/modules/TBIOPrivacy.sys.mjs").installTorChannelIsolation();'''
         replace(startup, '      case "profile-after-change": {', '      case "profile-after-change": {\n' + locks + policy)
     else:
