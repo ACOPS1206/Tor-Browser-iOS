@@ -362,6 +362,43 @@ def parse_map(items, label):
     return result
 
 
+def dylib_dependencies(path):
+    output = run(["otool", "-L", path]).stdout.decode()
+    return [line.strip().rsplit(" (", 1)[0] for line in output.splitlines()[1:]
+            if " (" in line]
+
+
+def normalize_xul_for_sideloading(app):
+    """On an unsigned staging copy, make XUL discoverable to suffix-based signers.
+
+    Rewrite all Mach-O consumers, including Helper and GeckoView. The engine
+    cache and xcarchive stay untouched. Every modified executable needs signing.
+    """
+    old = app / "Frameworks/XUL"
+    new = app / "Frameworks/XUL.dylib"
+    if not old.exists():
+        return
+    if old.is_symlink() or not macho(old) or new.exists():
+        raise SigningError("Unexpected XUL layout; cannot prepare sideloadable engine.")
+    binaries = [p for p in app.rglob("*") if not p.is_symlink() and macho(p)]
+    dependencies = {p: dylib_dependencies(p) for p in binaries}
+    old.rename(new)
+    run(["install_name_tool", "-id", "@rpath/XUL.dylib", new])
+    for original, names in dependencies.items():
+        path = new if original == old else original
+        for name in names:
+            if name.startswith("@") and name.endswith("/XUL"):
+                run(["install_name_tool", "-change", name, name + ".dylib", path])
+    # A filename-only rename would still crash dyld. Check the written commands.
+    for path in binaries:
+        path = new if path == old else path
+        if any(name.endswith("/XUL") for name in dylib_dependencies(path)):
+            raise SigningError(f"Stale XUL load command after packaging: {path.name}")
+    if "@rpath/XUL.dylib" not in dylib_dependencies(new):
+        raise SigningError("XUL dylib install name was not updated.")
+    print("Prepared Frameworks/XUL.dylib and all Mach-O load commands for re-signing")
+
+
 def package_archive(archive, output):
     apps = list((Path(archive) / "Products/Applications").glob("*.app"))
     if len(apps) != 1:
@@ -375,6 +412,7 @@ def package_archive(archive, output):
         payload.mkdir()
         dest = payload / apps[0].name
         run(["ditto", apps[0], dest])
+        normalize_xul_for_sideloading(dest)
         write_plist(dest / "SigningRequirements.plist", {
             ".": {MEMORY: True}, "PlugIns/Reynard Helper.appex": {"get-task-allow": True},
             "PlugIns/OpenIn.appex": {}})

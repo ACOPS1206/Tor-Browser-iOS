@@ -7,6 +7,25 @@ ditto·devicectl 자체는 Apple의 독점 도구입니다. 모든 도구까지 
 Apple 계정 로그인은 Xcode에서만 수행하며, 스크립트는 계정 암호나 인증 API를 다루지 않습니다.
 iloader/isideload의 GrandSlam 로그인에 의존하지 않습니다.
 
+## 시작 즉시 종료: XUL 서명 거부
+
+`DYLD / Library not loaded: @rpath/XUL`와 `code signature invalid`가 함께
+나오면 엔진 라이브러리 서명이 거부된 것입니다. 라이브러리가 없다는 뜻으로
+해석하거나 JIT·NoScript 오류로 판단하지 않습니다.
+
+배포 패키징은 서명 전 임시 복사본에서 `Frameworks/XUL`을 `XUL.dylib`으로
+바꾸고, 메인 앱·Helper·GeckoView 등 모든 Mach-O의 load command와 라이브러리
+install name을 갱신·재검사합니다. 확장자로 라이브러리를 수집하는 서명 도구와의
+호환성을 위한 변경이며, 원본 xcarchive 및 엔진 캐시는 수정하지 않습니다.
+새 IPA도 설치 도구에서 재서명해야 하며 개발자 인증서가 Actions에 포함되지 않습니다.
+
+2026-10-16 충돌 기록은 XUL 서명 거부를 확인해 주지만 설치된 서명 도구 버전이나
+정확한 누락 경위까지 입증하지는 않습니다. 참고한 isideload 소스는
+`8ca39b6203263e539408986e546c42e7c1cc3699`의
+`isideload/src/sideload/bundle.rs` (`find_dylibs`)입니다.
+macOS 검사에서는 실제 dylib·소비자 바이너리를 생성하여 재패키징 후 경로·서명·
+로딩을 검사합니다. iPhone의 SideStore/iLoader 재서명·실행 성공은 별도 검증이 필요합니다.
+
 ## 첫 실행 준비
 
 1. 전체 Xcode를 설치하고 한 번 실행해 라이선스·iOS 플랫폼 설치를 완료합니다.

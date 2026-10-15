@@ -165,6 +165,17 @@ class ArchiveTests(unittest.TestCase):
             for bundle in sign.app_bundles(app)[1:]:
                 self.assertLess(order.index(bundle), order.index(app))
 
+    def test_normalized_xul_is_in_signing_order_and_collision_is_rejected(self):
+        with tempfile.TemporaryDirectory() as d:
+            app = self.fixture(Path(d))
+            normalized = app / "Frameworks/XUL.dylib"
+            normalized.write_bytes((app / "Frameworks/XUL").read_bytes())
+            with self.assertRaisesRegex(sign.SigningError, "Unexpected XUL layout"):
+                sign.normalize_xul_for_sideloading(app)
+            (app / "Frameworks/XUL").unlink()
+            sign.normalize_xul_for_sideloading(app)
+            self.assertIn(normalized, sign.signing_order(app))
+
     def test_bundle_remap_retains_extension_relationship_without_mutation(self):
         with tempfile.TemporaryDirectory() as d:
             app = self.fixture(Path(d))

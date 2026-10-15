@@ -2,7 +2,7 @@ name: Build Tor Browser iOS IPA
 on:
   push:
     branches: [main]
-    paths-ignore: ['README.md', 'docs/**', '.gitignore', 'scripts/sign-ipa.*', 'scripts/prepare-signing-project.py', 'tests/test_signing.py', 'tests/macos-signing-smoke.py', '.github/workflows/signing-tools.yml']
+    paths-ignore: ['README.md', 'docs/**', '.gitignore', 'scripts/prepare-signing-project.py']
   workflow_dispatch:
 permissions:
   contents: read
@@ -70,6 +70,8 @@ jobs:
       - name: Type-check Tor interface against UIKit
         run: |
           xcrun swiftc -typecheck -default-isolation MainActor -sdk "$(xcrun --sdk iphoneos --show-sdk-path)" -target arm64-apple-ios17.4 -import-objc-header overlay/Reynard/Tor/TorService.h overlay/Reynard/Tor/TorNetwork.swift overlay/Reynard/Tor/TorPrivacy.swift overlay/Reynard/Tor/TorStatusViewController.swift overlay/Reynard/Tor/TorBrowserStatus.swift tests/ios-stubs.swift
+      - name: Test actual Mach-O XUL repackaging and loading
+        run: python3 tests/macos-signing-smoke.py
       - name: Install dependencies
         run: |
           brew install python@3.12 lld cbindgen llvm cocoapods
