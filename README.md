@@ -1,9 +1,9 @@
-<p style="text-align: center">
+<p align="center">
 <img src="icon.png" style="width: 200px">
 </p>
-<h1 style="text-align: center">Tor Browser iOS — Onion Reynard (experimental)</h1>
+<h1 align="center">Tor Browser iOS — Onion Reynard (experimental)</h1>
 
-<p style="text-align: center">Reynard's native iOS Gecko browser with an embedded Tor client. This is an <b>Unofficial experimental project</b>, unaffiliated with the Tor Project. It does not yet provide all official Tor Browser protections.</p>
+<p align="center">Reynard's native iOS Gecko browser with an embedded Tor client. This is an <b>Unofficial experimental project</b>, unaffiliated with the Tor Project. It does not yet provide all official Tor Browser protections.</p>
 
 ## 구현된 기능
 
