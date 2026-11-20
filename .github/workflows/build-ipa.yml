@@ -95,6 +95,7 @@ jobs:
       - name: Apply Tor integration
         run: |
           python3 scripts/apply-overlay.py upstream browser
+          python3 scripts/install-app-icon.py upstream
           python3 scripts/configure-privacy-ui.py upstream
       - name: Parse modified native stores and navigation policy
         run: |
